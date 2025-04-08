@@ -3,7 +3,7 @@ Repositorio del Grupo 05, cuyos integrantes son:
 * Daniel Ruiz - 202273525-2
 * Matias Huiscan - 202273628-3
 * Diego Sierra - 202273531-7
-* Agustin Santibañez -
+* Agustin Santibañez - 202204682-1
 * **Tutor**: Maximiliano Tapia
 
 ## Wiki
