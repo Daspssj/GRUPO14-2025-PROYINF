@@ -23,15 +23,15 @@ DB_USER=user
 DB_PASSWORD=password  
 DB_NAME=mydb
 
-3. (les instalará las dependencias se suele demorar un poco la primera vez con esto levantan el proyecto)
+3. (les instalará las dependencias se suele demorar un poco la primera vez con esto levantan el proyecto)  
 docker compose up --build
 
-(para detener los contenedores)
+(para detener los contenedores)  
 docker compose down -v
 
-si no les ejecuta asegurense de estar en la carpeta correcta
-si trabajan desde windows deben tener instalado WSL2 y tenerlo activado en docker desktop
-esto se puede verificar en
-Configuración 
--Resources
+si no les ejecuta asegurense de estar en la carpeta correcta  
+si trabajan desde windows deben tener instalado WSL2 y tenerlo activado en docker desktop  
+esto se puede verificar en  
+Configuración   
+-Resources  
   -WSL integration (esto debe estar activo)
