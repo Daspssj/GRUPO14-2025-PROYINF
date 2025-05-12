@@ -16,7 +16,8 @@ git clone https://github.com/MatiasBV/analisis-y-diseno-de-software.git
 
 Ejecutar en terminal:
 
-1. (copien y peguen este fragmento completo en la bash tal y como está)
+1. Deben navegar hasta la carpeta analisis-y-diseno-de-software/mi-proyecto-node-docker  
+(copien y peguen este fragmento completo en la bash tal y como está)
 DB_HOST=postgres_db  
 DB_PORT=5432  
 DB_USER=user  
