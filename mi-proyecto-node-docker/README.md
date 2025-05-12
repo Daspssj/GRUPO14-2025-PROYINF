@@ -34,4 +34,5 @@ si trabajan desde windows deben tener instalado WSL2 y tenerlo activado en docke
 esto se puede verificar en  
 Configuración   
 -Resources  
-  -WSL integration (esto debe estar activo)
+  -Configure which WSL 2 distros you want to access Docker from. (esto debe estar activo)  
+  -Enable integration with additional distros:(esto debe estar activo)  
