@@ -14,7 +14,7 @@ Este es un ejemplo de una aplicación Node.js usando Express, Docker y PostgreSQ
 ### 1. Clonar el repositorio
 git clone https://github.com/MatiasBV/analisis-y-diseno-de-software.git
 
-Ejecutar en BASH:
+Ejecutar en terminal:
 
 1. (copien y peguen este fragmento completo en la bash tal y como está)
 DB_HOST=postgres_db  
