@@ -150,4 +150,3 @@ rm cookies.txt
 - Asegúrate de que el servidor Node.js esté ejecutándose en el puerto 3000
 - El archivo `cookies.txt` almacena las cookies de sesión para autenticación
 - Las rutas pueden variar según tu configuración de servidor
-```
