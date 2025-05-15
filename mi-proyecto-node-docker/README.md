@@ -49,5 +49,105 @@ Para reiniciar un servicio específico:
 Para detener todos los contenedores sin eliminar volúmenes:
   - docker compose down
 
+# Autenticación y pruebas con `curl` y Docker
 
+Este documento resume los pasos para trabajar con autenticación de usuarios en un servidor Node.js utilizando `curl` y Docker.
 
+## Comandos Docker básicos
+
+### Iniciar los contenedores
+
+```bash
+docker-compose up --build
+```
+
+### Eliminar los contenedores
+
+```bash
+docker-compose down
+```
+
+### Reanudar los contenedores detenidos
+
+```bash
+docker-compose start
+```
+
+### Pausar contenedores en ejecución
+
+```bash
+docker-compose stop
+```
+
+---
+
+## Dependencias necesarias en Node.js
+
+Instala estas dependencias en tu backend antes de compilar:
+
+```bash
+npm install express-session bcrypt
+```
+
+---
+
+## Operaciones de autenticación
+
+### Crear un nuevo usuario
+
+```bash
+curl -X POST http://localhost:3000/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Daniel","correo":"daniel@gmail.com","contrasena":"123","rol":"alumno"}'
+```
+
+### Iniciar sesión (y guardar cookies)
+
+```bash
+curl -X POST http://localhost:3000/auth/login \
+  -c cookies.txt \
+  -H "Content-Type: application/json" \
+  -d '{"correo":"daniel@gmail.com","contrasena":"123"}'
+```
+
+### Verificar si el usuario está autenticado (panel alumno)
+
+```bash
+curl -X GET http://localhost:3000/auth/alumno/panel \
+  -b cookies.txt
+```
+
+### Verificar usuario logueado (whoami)
+
+```bash
+curl http://localhost:3000/auth/whoami \
+  -b cookies.txt
+```
+
+### Ver todos los usuarios registrados (ruta temporal)
+
+```bash
+curl http://localhost:3000/auth/usuarios
+```
+
+### Cerrar sesión
+
+```bash
+curl -X POST http://localhost:3000/auth/logout \
+  -b cookies.txt
+```
+
+### Eliminar archivo de sesión local
+
+```bash
+rm cookies.txt
+```
+
+---
+
+## Notas adicionales
+
+- Asegúrate de que el servidor Node.js esté ejecutándose en el puerto 3000
+- El archivo `cookies.txt` almacena las cookies de sesión para autenticación
+- Las rutas pueden variar según tu configuración de servidor
+```
