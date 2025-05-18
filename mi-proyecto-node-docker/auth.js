@@ -53,6 +53,18 @@ router.post('/logout', (req, res) => {
   res.send('Sesión cerrada');
 });
 
+// Obtener usuarios
+router.get('/usuarios', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, nombre, correo, rol FROM usuarios');
+    res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).send('Error al obtener usuarios');
+  }
+});
+
+
 // Ver usuario actual logueado
 router.get('/whoami', (req, res) => {
   if (req.session.user) {
@@ -62,16 +74,13 @@ router.get('/whoami', (req, res) => {
   }
 });
 
-// Vista protegida para alumnos
+// Vista protegida para alumnos: panel
 router.get('/alumno/panel', async (req, res) => {
   if (!req.session.user || req.session.user.rol !== 'alumno') {
     return res.status(403).send('Acceso no autorizado');
   }
 
   try {
-    const { id, nombre } = req.session.user;
-
-    // Obtener los ensayos disponibles
     const ensayos = await pool.query(
       `SELECT e.id, e.nombre, m.nombre AS materia
        FROM ensayos e
@@ -79,7 +88,7 @@ router.get('/alumno/panel', async (req, res) => {
     );
 
     res.json({
-      alumno: nombre,
+      alumno: req.session.user.nombre,
       ensayos_disponibles: ensayos.rows
     });
   } catch (err) {
@@ -88,18 +97,43 @@ router.get('/alumno/panel', async (req, res) => {
   }
 });
 
-// Ruta temporal para listar todos los usuarios
-router.get('/usuarios', async (req, res) => {
+// Obtener preguntas de un ensayo específico
+router.get('/alumno/ensayo/:id', async (req, res) => {
+  if (!req.session.user || req.session.user.rol !== 'alumno') {
+    return res.status(403).send('Acceso no autorizado');
+  }
+
+  const ensayoId = req.params.id;
   try {
-    const result = await pool.query(
-      'SELECT id, nombre, correo, rol FROM usuarios ORDER BY id'
+    const preguntas = await pool.query(
+      `SELECT p.id, p.enunciado, p.imagen, p.opcion_a, p.opcion_b, p.opcion_c, p.opcion_d
+       FROM ensayo_pregunta ep
+       JOIN preguntas p ON ep.pregunta_id = p.id
+       WHERE ep.ensayo_id = $1`,
+      [ensayoId]
     );
-    res.json(result.rows);
+
+    const titulo = await pool.query('SELECT nombre FROM ensayos WHERE id = $1', [ensayoId]);
+    if (titulo.rows.length === 0) return res.status(404).send('Ensayo no encontrado');
+
+    res.json({
+      ensayo: titulo.rows[0].nombre,
+      preguntas: preguntas.rows.map(p => ({
+        id: p.id,
+        enunciado: p.enunciado,
+        imagen: p.imagen,
+        opciones: {
+          A: p.opcion_a,
+          B: p.opcion_b,
+          C: p.opcion_c,
+          D: p.opcion_d
+        }
+      }))
+    });
   } catch (err) {
     console.error(err);
-    res.status(500).send('Error al obtener usuarios');
+    res.status(500).send('Error al obtener preguntas del ensayo');
   }
 });
-
 
 module.exports = router;

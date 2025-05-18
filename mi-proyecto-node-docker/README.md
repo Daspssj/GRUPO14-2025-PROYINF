@@ -89,6 +89,13 @@ Instala estas dependencias en tu backend antes de compilar:
 npm install express-session bcrypt
 ```
 
+## Dependencias necesarias para formateo
+
+```bash
+sudo apt update
+sudo apt install jq
+```
+
 ---
 
 ## Operaciones de autenticación
@@ -127,7 +134,15 @@ curl http://localhost:3000/auth/whoami \
 ### Ver todos los usuarios registrados (ruta temporal)
 
 ```bash
-curl http://localhost:3000/auth/usuarios
+curl -s http://localhost:3000/auth/usuarios \
+  -b cookies.txt | jq
+```
+
+### Ver preguntas del ensayo 1
+
+```bash
+curl -s http://localhost:3000/auth/alumno/ensayo/1 \
+  -b cookies.txt | jq
 ```
 
 ### Cerrar sesión
