@@ -11,3 +11,4 @@ Accede a la wiki con el siguiente [enlace](https://github.com/Daspssj/GRUPO05-20
 
 ## Videos
 * [Video presentación cliente](https://aula.usm.cl/pluginfile.php/6994529/mod_resource/content/1/video1943571039.mp4)
+* [Video Prototipo Hito 3](https://youtu.be/vbStSvS_AoU)
