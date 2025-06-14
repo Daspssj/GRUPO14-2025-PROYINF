@@ -1,0 +1,30 @@
+.panel-container {
+  max-width: 600px;
+  margin: 40px auto;
+  padding: 2rem;
+  background: #eef4fa;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.panel-options {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 20px;
+}
+
+.panel-options button {
+  padding: 10px;
+  font-size: 16px;
+  background: #337ab7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.panel-options button:hover {
+  background: #286090;
+}

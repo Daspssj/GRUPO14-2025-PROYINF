@@ -1,0 +1,44 @@
+.panel-alumno {
+  font-family: 'Segoe UI', sans-serif;
+  background: #f7f9fc;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #4b6cb7;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 10px;
+}
+
+.panel-nav {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+}
+
+.panel-nav button {
+  background-color: #1f4e79;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.panel-nav button:hover {
+  background-color: #15507c;
+}
+
+.panel-main {
+  margin-top: 30px;
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}

@@ -1,0 +1,191 @@
+body {
+    background: #f2f2f2;
+    font-family: Arial, sans-serif;
+}
+
+.login-container {
+    background: #ffffff;
+    width: 350px;
+    padding: 30px;
+    margin: 100px auto;
+    box-shadow: 0 0 15px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.login-container h2 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.login-container input {
+    width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.login-container button {
+    width: 100%;
+    padding: 10px;
+    background: #009688;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.login-container button:hover {
+    background: #00796b;
+}
+
+.error {
+    color: red;
+    margin-top: 15px;
+}
+.login-container a {
+    display: block;
+    margin: 10px 0;
+    color: #00796b;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.login-container a:hover {
+    text-decoration: underline;
+}
+.login-container button {
+    width: 100%;
+    padding: 10px;
+    background: #009688;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.login-container button:hover {
+    background: #00796b;
+}
+.error {
+    color: red;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.exito {
+    color: green;
+    font-weight: bold;
+    margin-top: 10px;
+}
+.login-container textarea {
+    width: 100%;
+    height: 120px;
+    padding: 10px;
+    resize: vertical;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 15px;
+    margin-top: 10px;
+}
+.contenedor-ancho {
+    max-width: 95%;
+    margin: 30px auto;
+    font-family: Arial, sans-serif;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 14px;
+}
+
+th, td {
+    padding: 12px 10px;
+    border: 1px solid #ccc;
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    background-color: #e0e0e0;
+    color: #000;
+    font-weight: bold;
+}
+
+tr:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+img {
+    max-width: 100px;
+    height: auto;
+}
+
+.filter-container {
+    margin: 15px 0;
+}
+
+a {
+    color: #00796b;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+.preguntas-listado {
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-top: 15px;
+    background-color: #fafafa;
+}
+
+.login-container {
+  max-width: 400px;
+  margin: 40px auto;
+  padding: 2rem;
+  background: #f5f5f5;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+.login-container h2 {
+  text-align: center;
+}
+
+.login-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.login-container input,
+.login-container select,
+.login-container button {
+  padding: 10px;
+  font-size: 16px;
+}
+
+.login-container .error {
+  color: red;
+  text-align: center;
+}
+
+.login-container .success {
+  color: green;
+  text-align: center;
+}
+
+.toggle-mode {
+  text-align: center;
+  color: blue;
+  cursor: pointer;
+  margin-top: 10px;
+  text-decoration: underline;
+}
