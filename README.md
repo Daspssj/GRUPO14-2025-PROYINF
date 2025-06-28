@@ -1,229 +1,188 @@
 Proyecto de Ensayos PAES: Plataforma de Evaluación Educativa
-Este proyecto implementa una plataforma de ensayos educativos utilizando una arquitectura de microservicios con Node.js y PostgreSQL, orquestada con Docker Compose, y un frontend desarrollado en React.
+Este repositorio contiene la implementación de una plataforma para la gestión y realización de ensayos de preparación académica, utilizando una arquitectura de microservicios. Nuestro objetivo es proporcionar una herramienta robusta para estudiantes y docentes.
 
-🚀 Características Principales
-Autenticación y Autorización: Gestión de usuarios (alumnos, docentes, administradores) con JWT.
+ -Descripción General
+El proyecto se estructura en varios componentes interconectados:
 
-Gestión de Materias: CRUD de materias.
+Autenticación de Usuarios: Permite el registro e inicio de sesión para alumnos, docentes y administradores.
 
-Banco de Preguntas: Creación, edición, eliminación y listado de preguntas por materia.
+Gestión de Contenido: Maneja materias, preguntas (con opciones y respuestas correctas) y la creación de ensayos.
 
-Gestión de Ensayos: Creación de ensayos asociando preguntas existentes, y modificación/eliminación de ensayos.
+Realización de Ensayos: Los alumnos pueden completar ensayos.
 
-Resolución de Ensayos: Los alumnos pueden rendir ensayos y sus respuestas son registradas.
+Resultados Detallados: Ofrece la visualización de resultados tanto para el alumno individual como para los docentes (con acceso a todos los resultados).
 
-Resultados: Visualización de resultados de ensayos para alumnos (propios) y docentes/administradores (todos).
-
-API Gateway (Nginx): Centraliza las peticiones al backend y maneja CORS.
-
-🛠 Tecnologías Utilizadas
-Backend: Node.js, Express.js
+- Tecnologías Clave
+Backend: Node.js (Express.js)
 
 Base de Datos: PostgreSQL
 
-ORM/Conexión DB: pg (cliente de PostgreSQL para Node.js), bcryptjs (para hashing de contraseñas), jsonwebtoken (para JWT).
+Frontend: React.js
 
-Frontend: React.js, axios (para peticiones HTTP).
-
-Contenedorización: Docker, Docker Compose
+Orquestación: Docker Compose (para gestionar contenedores de microservicios, base de datos y un API Gateway)
 
 API Gateway: Nginx
 
-📋 Prerrequisitos
-Asegúrate de tener instalado lo siguiente en tu sistema:
+- Requisitos del Sistema
+Para ejecutar este proyecto, necesitará tener instalado:
 
-Docker Desktop: Incluye Docker Engine y Docker Compose.
+Docker Desktop: Incluye Docker Engine y Docker Compose. (Puede encontrar las instrucciones de instalación en el sitio web oficial de Docker).
 
-Instalar Docker Desktop
+Node.js y npm (o Yarn): Necesario para el desarrollo del frontend. (Disponible en el sitio web oficial de Node.js).
 
-Node.js y npm (o Yarn): Necesario para correr el frontend en desarrollo.
+Un editor de código, como VS Code.
 
-Instalar Node.js (se recomienda la versión LTS)
+- Pasos para Configurar y Ejecutar
+Siga estos pasos desde la terminal en la raíz del proyecto.
 
-Un editor de código: Como VS Code.
+1. Clonar el Repositorio
+Si aún no ha clonado este proyecto, use el siguiente comando:
 
-⚙️ Configuración del Entorno
-Clonar el Repositorio:
+git clone https://github.com/Daspssj/GRUPO05-2025-PROYINF.git
+cd GRUPO05-2025-PROYINF
 
-git clone <URL_DE_TU_REPOSITORIO_GITHUB>
-cd nombre-de-tu-proyecto
-
-Variables de Entorno (.env):
-Cada microservicio de Node.js necesita su propio archivo .env para la configuración. Crea los siguientes archivos en los directorios especificados:
+2. Configuración de Variables de Entorno
+Cree un archivo .env en cada una de las siguientes carpetas (son sensibles a mayúsculas/minúsculas y la extensión .env es importante).
 
 services/auth-service/.env
 
-PORT=5001
-JWT_SECRET=tu_secreto_muy_seguro_y_largo
-DB_USER=user
-DB_HOST=postgres-paes
-DB_DATABASE=paes_db
-DB_PASSWORD=password
-DB_PORT=5432
-
-Importante: Cambia tu_secreto_muy_seguro_y_largo por una cadena de texto aleatoria y compleja.
-
 services/materias-service/.env
-
-PORT=5005
-DB_USER=user
-DB_HOST=postgres-paes
-DB_DATABASE=paes_db
-DB_PASSWORD=password
-DB_PORT=5432
-JWT_SECRET=tu_secreto_muy_seguro_y_largo
 
 services/preguntas-service/.env
 
-PORT=5002
-DB_USER=user
-DB_HOST=postgres-paes
-DB_DATABASE=paes_db
-DB_PASSWORD=password
-DB_PORT=5432
-JWT_SECRET=tu_secreto_muy_seguro_y_largo
-
 services/ensayos-service/.env
-
-PORT=5003
-DB_USER=user
-DB_HOST=postgres-paes
-DB_DATABASE=paes_db
-DB_PASSWORD=password
-DB_PORT=5432
-JWT_SECRET=tu_secreto_muy_seguro_y_largo
 
 services/resultados-service/.env
 
-PORT=5004
+services/respuestas-service/.env (si existe)
+
+El contenido general para cada uno será:
+
+PORT=XXXX
 DB_USER=user
 DB_HOST=postgres-paes
 DB_DATABASE=paes_db
 DB_PASSWORD=password
 DB_PORT=5432
-JWT_SECRET=tu_secreto_muy_seguro_y_largo
+JWT_SECRET=supersecretodev
 
-services/respuestas-service/.env (si tienes un servicio de respuestas separado y usas su puerto)
+Nota Importante: El valor de JWT_SECRET (supersecretodev en este ejemplo) debe ser idéntico en todos los archivos .env de los servicios que lo requieran.
 
-PORT=5000
-DB_USER=user
-DB_HOST=postgres-paes
-DB_DATABASE=paes_db
-DB_PASSWORD=password
-DB_PORT=5432
-JWT_SECRET=tu_secreto_muy_seguro_y_largo
+3. Archivo .gitignore (para Git)
+Asegúrese de que el archivo .gitignore exista en la raíz de su proyecto con el siguiente contenido. Esto evita que archivos innecesarios (como las carpetas node_modules o sus archivos .env con secretos) se suban a GitHub.
 
-Nota: Asegúrate de que el JWT_SECRET sea exactamente el mismo en todos los archivos .env de tus microservicios y en tu docker-compose.yml (si lo defines ahí para auth-service).
+# Directorios de módulos
+node_modules/
+frontend/node_modules/
+services/*/node_modules/
 
-Configuración de la Base de Datos (init_postgres.sql):
-El archivo db/init_postgres.sql contiene los esquemas de las tablas y datos iniciales para tu base de datos PostgreSQL. Este script se ejecuta automáticamente la primera vez que el contenedor postgres-paes se levanta.
+# Variables de entorno
+.env
+services/*/.env
 
-Si ya has levantado Docker Compose y tienes datos, y modificas init_postgres.sql: Necesitarás eliminar el volumen de Docker para PostgreSQL para que los cambios se apliquen.
+# Archivos de logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-docker volume ls # Para ver los volúmenes, busca el de tu postgres (ej. tuproyecto_postgres_data)
-docker volume rm <nombre_del_volumen_postgres>
+# Otros archivos de build o temporales
+build/
+.DS_Store
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.iml
+.idea/
 
-¡Advertencia! Esto eliminará permanentemente todos los datos de tu base de datos. Solo hazlo si quieres una base de datos limpia o si estás seguro de que no necesitas los datos existentes.
+4. Inicializar y Enviar Código (Solo si es la primera vez que sube o si el repositorio remoto está vacío)
+Si está subiendo este proyecto por primera vez a un repositorio de GitHub que estaba vacío o solo tenía un README.md generado, puede usar estos comandos para inicializar Git y subir su código.
 
-Instalar Dependencias del Frontend:
-Navega al directorio frontend e instala las dependencias:
+Desde la raíz de su proyecto en la terminal:
+
+# Inicializa Git en esta carpeta (si aún no lo está)
+git init
+
+# Prepara todos los archivos para el primer commit
+git add .
+
+# Guarda la primera versión de su proyecto localmente
+git commit -m "Carga inicial del proyecto"
+
+# Conecta su repositorio local con el remoto de GitHub
+git remote add origin https://github.com/Daspssj/GRUPO05-2025-PROYINF.git
+
+# Sube el proyecto a la rama 'main' en GitHub.
+# El --force reemplaza el contenido existente en el remoto, útil para la primera carga.
+git push -u origin master:main --force
+
+Nota: Es posible que se le pida su nombre de usuario y contraseña de GitHub.
+
+5. Instalar Dependencias del Frontend
+Navegue a la carpeta frontend e instale sus dependencias:
 
 cd frontend
 npm install # o yarn install
 
-Configuración del Proxy del Frontend:
-Asegúrate de que tu frontend/package.json tenga la línea de proxy apuntando al puerto correcto de tu Nginx gateway:
+6. Verificar el Proxy del Frontend
+Asegúrese de que en el archivo frontend/package.json exista la siguiente línea para que el frontend pueda comunicarse con el backend a través del Gateway Nginx:
 
 // En frontend/package.json
 "proxy": "http://localhost:80"
 
-Si tu Nginx escucha en un puerto diferente en tu host, ajústalo aquí.
-
-🚀 Ejecutar el Proyecto
+7. Iniciar los Servicios y el Frontend
 Levantar los Microservicios con Docker Compose:
-Desde la raíz de tu proyecto (donde se encuentra docker-compose.yml), ejecuta:
+Desde la raíz de su proyecto (donde está docker-compose.yml), ejecute:
 
 docker-compose up --build -d
 
-up: Inicia los servicios definidos en docker-compose.yml.
+Este comando construirá y levantará todos los servicios Docker (base de datos, microservicios y Nginx Gateway) en segundo plano.
 
---build: Fuerza la reconstrucción de las imágenes Docker (necesario cuando hay cambios en el código de los microservicios).
-
--d: Ejecuta los contenedores en modo "detached" (en segundo plano).
-
-Esto construirá las imágenes Docker para cada microservicio y las levantará junto con PostgreSQL y Nginx. Este proceso puede tardar unos minutos la primera vez.
-
-Verificar el Estado de los Contenedores:
-Puedes verificar que todos los servicios estén corriendo correctamente con:
+Verificar el estado de los Contenedores:
 
 docker-compose ps
 
-Todos los servicios (auth-service, ensayos-service, materias-service, preguntas-service, resultados-service, respuestas-service, postgres-paes, paes-gateway) deberían mostrar Up en la columna State.
+Todos los servicios deberían mostrar Up.
 
 Iniciar el Frontend:
-En una nueva terminal, navega al directorio frontend y ejecuta el servidor de desarrollo de React:
+En una nueva terminal, navegue al directorio frontend y ejecute:
 
 cd frontend
 npm start # o yarn start
 
-Esto abrirá tu aplicación React en el navegador (generalmente en http://localhost:3000).
+Esto iniciará la aplicación React en su navegador (generalmente en http://localhost:3000).
 
-🌐 Acceso a la Aplicación
-Una vez que todos los servicios y el frontend estén en marcha:
+- Acceso a la Aplicación
+Una vez que todos los servicios estén en marcha, acceda a la aplicación a través de su navegador en: http://localhost:3000.
 
-Abre tu navegador y ve a: http://localhost:3000
+- Credenciales de Prueba
+Para inicializar en la pagina debe crear un NUEVO USUARIO ya sea de docente o estudiante, y desde ahi empezar a trabajar pues el proyecto no cuenta con cuentas registradas previamente.
 
-Desde allí, podrás interactuar con la aplicación. Las peticiones a la API serán redirigidas por el proxy de desarrollo de React a tu Nginx Gateway (http://localhost:80), y este a su vez las enrutará al microservicio correspondiente.
+troubleshooting
+- Consejos para Solución de Problemas
+Problemas de Conexión (ej. 404 Not Found en frontend):
 
-🔑 Credenciales de Prueba
-Para iniciar sesión y probar la aplicación, puedes usar las credenciales que insertes en tu db/init_postgres.sql. Por ejemplo:
+Asegúrese de que todos los contenedores Docker estén Up (docker-compose ps).
 
-Administrador:
+Verifique la configuración del proxy en frontend/package.json y del proxy_pass en gateway/nginx.conf.
 
-Correo: admin@example.com (o el que hayas definido)
+Intente reiniciar Docker Compose (docker-compose down y luego docker-compose up --build -d).
 
-Contraseña: password123 (o la que hayas hasheado e insertado)
+Errores del Backend (500 Internal Server Error, Connection Refused):
 
-Docente:
+Revise los logs del microservicio específico que falla (ej. docker-compose logs auth-service).
 
-Correo: docente@example.com
+Confirme que las variables de entorno de la base de datos en los archivos .env de los servicios sean correctas (DB_HOST debe ser postgres-paes).
 
-Contraseña: password123
+Problemas de Autenticación (401 Unauthorized, 403 Forbidden):
 
-Alumno:
+Verifique que el JWT_SECRET sea idéntico en todos los archivos .env relevantes (servicios y auth-service).
 
-Correo: alumno@example.com
+Asegúrese de que los roles asignados a sus usuarios de prueba coincidan con los roles esperados por los middlewares de autorización.
 
-Contraseña: password123
+Cambios en la Base de Datos no Aplicados:
 
-Importante: Asegúrate de que las contraseñas insertadas en init_postgres.sql estén hasheadas con bcryptjs, no en texto plano.
+Si modificó db/init_postgres.sql y los cambios no aparecen, es probable que el volumen de Docker para PostgreSQL ya exista. Para recrear la base de datos desde cero (perdiendo todos los datos existentes), use:
 
-🐛 Solución de Problemas Comunes
-404 Not Found en el Frontend:
-
-Verifica que el frontend está apuntando al puerto correcto del Nginx Gateway ("proxy": "http://localhost:80" en frontend/package.json).
-
-Asegúrate de que el Nginx Gateway (gateway/nginx.conf) tiene la configuración de proxy_pass correcta para cada microservicio y que los nombres de los upstream coinciden con los nombres de servicio en docker-compose.yml.
-
-Reinicia completamente Docker Compose (docker-compose down y luego docker-compose up --build -d).
-
-500 Internal Server Error o Connection Refused desde el Backend:
-
-Revisa los logs del microservicio específico que está fallando (ej. docker-compose logs auth-service).
-
-Asegúrate de que el microservicio esté escuchando en el puerto correcto especificado en su .env y en docker-compose.yml.
-
-Verifica que las variables de entorno de la base de datos en los .env sean correctas (DB_HOST debe ser el nombre del servicio de la base de datos, postgres-paes).
-
-Errores de JWT_SECRET o 401 Unauthorized/403 Forbidden:
-
-Asegúrate de que la variable JWT_SECRET sea exactamente la misma en todos los archivos .env de los microservicios que validan tokens y en el auth-service.
-
-Verifica que los middlewares verificarToken y authorizeRoles estén correctamente importados y utilizados en las rutas de tus microservicios.
-
-Cambios en init_postgres.sql no se aplican:
-
-Recuerda que init_postgres.sql solo se ejecuta la primera vez que el volumen de PostgreSQL es creado. Para aplicar cambios en el esquema o en los datos iniciales después de la primera vez, debes eliminar el volumen de Docker de PostgreSQL y luego reiniciar Docker Compose.
-
-docker-compose down -v # Esto eliminará contenedores y volúmenes asociados
+docker-compose down -v
 docker-compose up --build -d
