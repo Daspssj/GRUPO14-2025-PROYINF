@@ -5,11 +5,9 @@ import './Login.css';
 const Login = ({ onLogin }) => {
   const [isLogin, setIsLogin] = useState(true);
 
-  // Campos comunes
   const [correo, setCorreo] = useState('');
   const [contrasena, setContrasena] = useState('');
 
-  // Solo para registro
   const [nombre, setNombre] = useState('');
   const [rol, setRol] = useState('alumno');
   const [claveSecreta, setClaveSecreta] = useState('');
@@ -29,7 +27,6 @@ const Login = ({ onLogin }) => {
     setMensaje('');
 
     if (isLogin) {
-      // Login
       try {
         const res = await axiosInstance.post('/api/auth/login', {
           correo,
@@ -44,7 +41,6 @@ const Login = ({ onLogin }) => {
         setError('Credenciales incorrectas');
       }
     } else {
-      // Registro
       if (!nombre || !correo || !contrasena || !rol) {
         setError('Todos los campos son obligatorios');
         return;
@@ -66,7 +62,7 @@ const Login = ({ onLogin }) => {
         setMensaje(`Usuario ${res.data.nombre} creado con éxito`);
         setIsLogin(true);
     } catch (err) {
-        console.error('Error completo:', err); // NUEVO: imprime todo el error
+        console.error('Error completo:', err);
 
         if (err.response?.data?.error) {
             setError(err.response.data.error);
