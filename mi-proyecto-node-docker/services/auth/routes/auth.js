@@ -3,11 +3,7 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs'); // Solo necesitas bcryptjs aquí
-// REMOVIDO: const { SECRET } = require('../../_common/middleware'); // Esta línea causaba el problema.
-
-// Asegúrate de importar verificarToken y authorizeRoles si los vas a usar en otras rutas de este archivo
-// const { verificarToken, authorizeRoles } = require('../../_common/middleware/auth'); // Ruta correcta para middleware genérico
+const bcrypt = require('bcryptjs');
 
 // --- RUTA DE REGISTRO DE USUARIOS (NO REQUIERE AUTENTICACIÓN) ---
 router.post('/registro', async (req, res) => {
@@ -80,8 +76,6 @@ router.post('/login', async (req, res) => {
             rol: usuario.rol
         };
 
-        // --- CLAVE: Usar process.env.JWT_SECRET (la variable de entorno de Docker Compose) ---
-        // Asegúrate de que esta variable esté correctamente definida en tu docker-compose.yml
         const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '2h' }); 
         console.log(`✅ Login exitoso para usuario ID: ${usuario.id}, Rol: ${usuario.rol}`);
         res.status(200).json({ token, usuario: { id: usuario.id, nombre: usuario.nombre, correo: usuario.correo, rol: usuario.rol } });
