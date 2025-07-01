@@ -7,7 +7,7 @@ import VerEnsayos from './VerEnsayos';
 import ResolverEnsayo from './ResolverEnsayo';
 import VerResultadosAlumno from './VerResultadosAlumno'; 
 import VerResultadosDocente from './VerResultadosDocente';
-
+ 
 const App = () => {
   const [usuario, setUsuario] = useState(null);
   const navigate = useNavigate(); 
