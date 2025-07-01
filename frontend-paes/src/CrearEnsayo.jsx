@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import axiosInstance from './services/axiosConfig'; // Asegúrate de que esta ruta de importación sea correcta
-import './CrearEnsayo.css'; // Asegúrate de que este archivo CSS exista
+import axiosInstance from './services/axiosConfig';
+import './CrearEnsayo.css';
 
 const CrearEnsayo = ({ usuario }) => {
   const [materias, setMaterias] = useState([]);
@@ -10,9 +10,9 @@ const CrearEnsayo = ({ usuario }) => {
   const [preguntasSeleccionadas, setPreguntasSeleccionadas] = useState([]);
   const [error, setError] = useState('');
   const [mensajeExito, setMensajeExito] = useState('');
-  const [isFadingOut, setIsFadingOut] = useState(false); // Nuevo estado para la animación de desvanecimiento
+  const [isFadingOut, setIsFadingOut] = useState(false);
 
-  // Cargar materias al inicio
+
   useEffect(() => {
     const fetchMaterias = async () => {
       try {
@@ -34,7 +34,6 @@ const CrearEnsayo = ({ usuario }) => {
     fetchMaterias();
   }, []);
 
-  // Cargar preguntas disponibles cuando cambia la materia seleccionada
   useEffect(() => {
     const fetchPreguntas = async () => {
       if (materiaId) {
@@ -49,7 +48,7 @@ const CrearEnsayo = ({ usuario }) => {
 
           const res = await axiosInstance.get(`/api/preguntas/?materia_id=${materiaId}`, config); 
           setPreguntas(res.data);
-          setPreguntasSeleccionadas([]); // Limpiar selecciones anteriores al cambiar materia
+          setPreguntasSeleccionadas([]);
         } catch (err) {
           console.error('Error al cargar preguntas:', err);
           setError(err.response?.data?.error || 'Error al cargar las preguntas para la materia seleccionada.');
@@ -60,20 +59,19 @@ const CrearEnsayo = ({ usuario }) => {
       }
     };
     fetchPreguntas();
-  }, [materiaId]); // Dependencia del efecto para recargarse cuando cambia materiaId
+  }, [materiaId]);
 
-  // Efecto para gestionar el mensaje de éxito y su desvanecimiento
   useEffect(() => {
     if (mensajeExito) {
-      setIsFadingOut(false); // Asegúrate de que no esté desvaneciéndose al aparecer
+      setIsFadingOut(false);
       const timer = setTimeout(() => {
-        setIsFadingOut(true); // Inicia el desvanecimiento
+        setIsFadingOut(true);
         const hideTimer = setTimeout(() => {
-          setMensajeExito(''); // Oculta el mensaje completamente
-          setIsFadingOut(false); // Resetear el estado de desvanecimiento
-        }, 500); // Duración de la transición de opacidad (debe coincidir con el CSS)
+          setMensajeExito('');
+          setIsFadingOut(false);
+        }, 500);
         return () => clearTimeout(hideTimer);
-      }, 3000); // El mensaje se muestra por 3 segundos antes de empezar a desvanecerse
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [mensajeExito]);
@@ -81,7 +79,7 @@ const CrearEnsayo = ({ usuario }) => {
 
   const crearEnsayo = async () => {
     setError('');
-    setMensajeExito(''); // Limpiar el mensaje de éxito existente antes de una nueva solicitud
+    setMensajeExito('');
 
     if (!nombre || !materiaId || preguntasSeleccionadas.length === 0) {
       setError('Por favor, completa todos los campos y selecciona al menos una pregunta.');
@@ -104,11 +102,10 @@ const CrearEnsayo = ({ usuario }) => {
       }, config);
       
       setMensajeExito(`Ensayo "${res.data.ensayo.nombre}" creado con éxito.`);
-      // Limpiar formulario después de éxito
       setNombre('');
       setMateriaId('');
       setPreguntasSeleccionadas([]);
-      setPreguntas([]); // También limpiar preguntas disponibles para una recarga limpia
+      setPreguntas([]);
       
     } catch (err) {
       console.error('Error al crear ensayo:', err);
@@ -147,7 +144,7 @@ const CrearEnsayo = ({ usuario }) => {
         ))}
       </select>
 
-      {materiaId && ( // Solo muestra la sección de preguntas si se ha seleccionado una materia
+      {materiaId && (
         <div className="preguntas-box">
           <h4>Seleccionar preguntas:</h4>
           {preguntas.length > 0 ? (
