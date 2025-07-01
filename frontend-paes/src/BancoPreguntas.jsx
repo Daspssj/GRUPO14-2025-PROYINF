@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axiosInstance from './services/axiosConfig';
 import './BancoPreguntas.css';
-
+ 
 const BancoPreguntas = () => {
   const [materias, setMaterias] = useState([]);
   const [materiaId, setMateriaId] = useState('');
