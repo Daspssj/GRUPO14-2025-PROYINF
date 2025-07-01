@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import axiosInstance from './services/axiosConfig'; // Asegúrate de que esta ruta de importación sea correcta
-import './BancoPreguntas.css'; // Asegúrate de que este archivo CSS exista
+import axiosInstance from './services/axiosConfig';
+import './BancoPreguntas.css';
 
 const BancoPreguntas = () => {
   const [materias, setMaterias] = useState([]);
@@ -8,10 +8,10 @@ const BancoPreguntas = () => {
   const [busqueda, setBusqueda] = useState('');
   const [preguntas, setPreguntas] = useState([]);
   const [crearVisible, setCrearVisible] = useState(false);
-  const [error, setError] = useState(''); // Estado para manejar errores
+  const [error, setError] = useState('');
 
   const [nuevaPregunta, setNuevaPregunta] = useState({
-    id: null, // Para manejar edición (PUT)
+    id: null,
     enunciado: '',
     imagen: '',
     opcion_a: '',
@@ -22,16 +22,11 @@ const BancoPreguntas = () => {
     materia_id: ''
   });
 
-  // El token se obtendrá automáticamente por axiosInstance debido al interceptor.
-  // No es necesario obtenerlo manualmente en cada llamada si solo lo usas para el header.
-  // const token = localStorage.getItem('token'); 
 
-  // Función genérica para cargar preguntas, usada por useEffect y handleSubmit
   const fetchPreguntas = async (currentMateriaId, currentBusqueda) => {
-    setError(''); // Limpia errores al intentar cargar
+    setError('');
     try {
-      // axiosInstance ya inyecta el token automáticamente.
-      const res = await axiosInstance.get('/api/preguntas', { // RUTA CORREGIDA: usa /api/preguntas
+      const res = await axiosInstance.get('/api/preguntas', {
         params: {
           materia_id: currentMateriaId,
           busqueda: currentBusqueda
@@ -44,12 +39,11 @@ const BancoPreguntas = () => {
     }
   };
 
-  // Cargar materias al inicio
   useEffect(() => {
     const fetchMaterias = async () => {
       try {
         setError('');
-        const res = await axiosInstance.get('/api/materias'); // RUTA CORRECTA: /api/materias
+        const res = await axiosInstance.get('/api/materias');
         setMaterias(res.data);
       } catch (err) {
         console.error('Error al cargar materias:', err);
@@ -59,27 +53,24 @@ const BancoPreguntas = () => {
     fetchMaterias();
   }, []);
 
-  // Cargar preguntas cuando cambia materiaId o busqueda
   useEffect(() => {
     fetchPreguntas(materiaId, busqueda);
-  }, [materiaId, busqueda, crearVisible]); // crearVisible como dependencia para recargar tras crear/editar
+  }, [materiaId, busqueda, crearVisible]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(''); // Limpiar errores previos
+    setError('');
 
     const url = nuevaPregunta.id
-      ? `/api/preguntas/${nuevaPregunta.id}` // RUTA CORRECTA para PUT: /api/preguntas/:id
-      : '/api/preguntas/crear-pregunta'; // RUTA CORRECTA para POST: /api/preguntas/crear-pregunta
+      ? `/api/preguntas/${nuevaPregunta.id}`
+      : '/api/preguntas/crear-pregunta';
     const method = nuevaPregunta.id ? 'put' : 'post';
 
     try {
-      await axiosInstance[method](url, nuevaPregunta); // axiosInstance ya maneja el token
+      await axiosInstance[method](url, nuevaPregunta);
       
-      // Después de crear/editar, recarga las preguntas para que la lista se actualice
       fetchPreguntas(materiaId, busqueda); 
 
-      // Limpieza del formulario y ocultar
       setCrearVisible(false);
       setNuevaPregunta({
         id: null,
@@ -102,11 +93,11 @@ const BancoPreguntas = () => {
     const confirmar = window.confirm('¿Estás seguro de que deseas eliminar esta pregunta?');
     if (!confirmar) return;
 
-    setError(''); // Limpiar errores previos
+    setError('');
     try {
-      await axiosInstance.delete(`/api/preguntas/eliminar-pregunta/${id}`); // RUTA CORREGIDA: /api/preguntas/eliminar-pregunta/:id
+      await axiosInstance.delete(`/api/preguntas/eliminar-pregunta/${id}`);
       
-      // Recargar lista actualizada
+
       fetchPreguntas(materiaId, busqueda);
     } catch (err) {
       console.error('Error al eliminar pregunta:', err);
@@ -131,8 +122,7 @@ const BancoPreguntas = () => {
 
   const handleToggleCrearForm = () => {
     setCrearVisible(!crearVisible);
-    // Limpiar el formulario si se cierra o se abre para una nueva pregunta
-    if (!crearVisible) { // Si se va a mostrar el formulario (antes estaba oculto)
+    if (!crearVisible) {
       setNuevaPregunta({
         id: null,
         enunciado: '',
