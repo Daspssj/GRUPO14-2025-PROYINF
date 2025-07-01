@@ -12,7 +12,7 @@ const CrearEnsayo = ({ usuario }) => {
   const [mensajeExito, setMensajeExito] = useState('');
   const [isFadingOut, setIsFadingOut] = useState(false);
 
-
+ 
   useEffect(() => {
     const fetchMaterias = async () => {
       try {
