@@ -1,15 +1,13 @@
 {
   "name": "_common",
   "version": "1.0.0",
+  "description": "Common modules for microservices",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
   "dependencies": {
-    "jsonwebtoken": "^9.0.2"
+    "jsonwebtoken": "^8.5.1",
+    "bcryptjs": "^2.4.3",
+    "pg": "^8.7.3",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2"
   }
 }
