@@ -1,68 +1,78 @@
-// index.js ─ Plantilla común para todos los micro‑servicios
-// ───────────────────────────────────────────────────────
-// ▸ Copia este archivo dentro de cada carpeta de servicio
-// ▸ Ajusta sólo 2 cosas:
-//       1. auth (sólo para el log /health)
-//       2. La importación de las rutas de ese servicio
-//          (p. ej.: const routes = require('./routes/ensayos');)
-//
-// Si tu servicio **no** necesita rutas públicas, deja PUBLIC_PATHS vacío
-// o comenta completamente la verificación de JWT.
-
+// index.js ─ Plantilla del microservicio Auth
 require('dotenv').config();
 
 const express = require('express');
-const cors    = require('cors'); // Se mantiene si se usa en otros servicios, pero se asegura que no se use con app.use()
-const verify  = require('../_common/middleware/verifyToken');
+// const cors = require('cors'); // CORS lo maneja el Gateway (Nginx)
+const verify = require('../_common/middleware/verifyToken');
 
-// 🔄  Ajusta la siguiente línea al archivo de rutas
-//     de **este** servicio (ej.: './routes/ensayos')
-const routes  = require('./routes/auth'); // Importa el router de auth.js
+const cookieParser = require('cookie-parser');      // opcional
+const session = require('express-session');         // opcional (no estrictamente necesario si usamos state JWT)
 
-// ───────────── Config genérica ─────────────
-const auth = process.env.auth || 'auth-service';
-const PORT         = process.env.PORT         || 5001;     // cada contenedor expone su puerto
+const routes = require('./routes/auth');            // <-- AQUÍ están /login, /registro, OAuth Google y /complete-profile
+
+// ───────────── Config ─────────────
+const SERVICE_NAME = process.env.SERVICE_NAME || 'auth-service';
+const PORT = Number(process.env.PORT || 5001);
 
 /**
- * Rutas públicas (NO exigen JWT) para este micro‑servicio.
- * Ahora usan el path tal cual lo recibe Express DESPUÉS de que Nginx
- * haya quitado el prefijo /api/auth.
+ * NOTA IMPORTANTE SOBRE NGINX:
+ * Con la configuración que te dejé, Nginx hace proxy:
+ *   location /api/auth/ { proxy_pass http://auth_service/; }
+ * Esto significa que al servicio le llega la ruta SIN el prefijo `/api/auth`.
+ * Ej.: GET /api/auth/me  --> el servicio recibe: GET /me
  */
-const PUBLIC_PATHS = [
-  '/health',    // ping de vida
-  '/login',     // login de usuarios (sin prefijo /api/auth)
-  '/registro'   // registro de usuarios (sin prefijo /api/auth)
-];
 
-// ───────────── App base ─────────────
+// Rutas PÚBLICAS (no requieren verifyToken)
+const PUBLIC_PATHS = new Set([
+  '/health',
+  '/login',
+  '/registro',
+  '/oauth/google/start',
+  '/oauth/google/callback',
+  '/complete-profile', // usa token temporal (purpose:onboarding), por eso NO pasa por verify normal
+]);
+
 const app = express();
 app.use(express.json());
 
-// Se comenta app.use(cors()) aquí ya que el Gateway (Nginx) es quien maneja CORS
-// app.use(cors());
+// Cookies + sesión (opcional). Puedes quitar esto si no la usas.
+app.use(cookieParser());
+app.use(
+  session({
+    name: 'sid',
+    secret: process.env.SESSION_SECRET || 'dev-secret',
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: false, // en prod con HTTPS: true
+    },
+  })
+);
 
-// ───────────── Middleware de bypass JWT ─────────────
+// Middleware para exigir JWT en rutas privadas
 app.use((req, res, next) => {
-  console.log(`Petición entrante: ${req.path}`);
-  // ¿la ruta solicitada está en la lista de públicas (tal como la recibe auth-service)?
-  if (PUBLIC_PATHS.includes(req.path)) {
-    console.log(`Ruta ${req.path} es pública. Pasando al siguiente middleware/ruta.`);
-    return next(); // acceso libre
-  }
-  // para servicios de solo‑auth podrías comentar esta línea ↓
-  console.log(`Ruta ${req.path} requiere verificación de token.`);
-  return verify(req, res, next); // exige y verifica JWT
+  // Preflight y HEAD no requieren auth
+  if (req.method === 'OPTIONS' || req.method === 'HEAD') return next();
+
+  // Si la ruta actual es pública, no pedir JWT
+  if (PUBLIC_PATHS.has(req.path)) return next();
+
+  // El resto pasa por verifyToken (espera payload { uid, rol })
+  return verify(req, res, next);
 });
 
-// Endpoint de salud (útil para docker‑compose healthcheck)
-app.get('/health', (_, res) => res.json({ ok: true, service: auth }));
+// Salud
+app.get('/health', (_req, res) => res.json({ ok: true, service: SERVICE_NAME }));
 
-// Rutas de negocio de este micro‑servicio
-// CAMBIO CLAVE: Montar el router en la raíz '/'
-// Porque Nginx ya quitó el '/api/auth'
+/**
+ * Monta el router principal en raíz "/"
+ * - IMPORTANTE: como Nginx quita el prefijo, aquí deben estar las rutas sin "/api/auth".
+ *   Ej.: router.get('/me') => expone GET /me (que Nginx mapea desde /api/auth/me)
+ */
 app.use('/', routes);
 
-// ───────────── Lanzar servidor ─────────────
 app.listen(PORT, () => {
-  console.log(`[${auth}] escuchando en puerto ${PORT}`);
+  console.log(`[${SERVICE_NAME}] escuchando en puerto ${PORT}`);
 });

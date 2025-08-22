@@ -81,32 +81,38 @@ const CrearEnsayo = ({ usuario }) => {
     setError('');
     setMensajeExito('');
 
+    if (usuario?.rol !== 'docente') {
+      setError('Solo docentes pueden crear ensayos.');
+      return;
+    }
     if (!nombre || !materiaId || preguntasSeleccionadas.length === 0) {
       setError('Por favor, completa todos los campos y selecciona al menos una pregunta.');
       return;
     }
 
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('token') || localStorage.getItem('accessToken');
       if (!token) {
-          setError('No hay token de autenticación para crear el ensayo.');
-          return;
+        setError('No hay token de autenticación para crear el ensayo.');
+        return;
       }
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
-      const res = await axiosInstance.post('/api/ensayos/crear-ensayo-con-preguntas', {
+      // 👇 Ya NO mandamos docente_id. El backend debe usar el id del JWT.
+      const payload = {
         nombre,
-        docente_id: usuario.id,
         materia_id: materiaId,
         preguntas: preguntasSeleccionadas
-      }, config);
-      
+      };
+
+      console.log('POST /api/ensayos/crear-ensayo-con-preguntas payload:', payload);
+      const res = await axiosInstance.post('/api/ensayos/crear-ensayo-con-preguntas', payload, config);
+
       setMensajeExito(`Ensayo "${res.data.ensayo.nombre}" creado con éxito.`);
       setNombre('');
       setMateriaId('');
       setPreguntasSeleccionadas([]);
       setPreguntas([]);
-      
     } catch (err) {
       console.error('Error al crear ensayo:', err);
       setError(err.response?.data?.error || 'Error al crear el ensayo. Inténtalo de nuevo.');

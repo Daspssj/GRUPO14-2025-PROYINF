@@ -1,461 +1,452 @@
+/* eslint-disable no-console */
 const express = require('express');
+const { Pool } = require('pg');
 const router = express.Router();
-const pool = require('../db');
-// Importa ambos middlewares: verificarToken y authorizeRoles
-// ¡CAMBIO CLAVE AQUÍ! Asegúrate de desestructurar authorizeRoles también
-const verificarToken = require('../../_common/middleware/verifyToken');
-const authorizeRoles = require('../../_common/middleware/authorizeRoles');
 
-console.log('--- routes/resultados.js: Middlewares importados ---'); // Nuevo log después de las importaciones
-console.log('verificarToken es:', typeof verificarToken); // Verifica que no sea 'undefined'
-console.log('authorizeRoles es:', typeof authorizeRoles); // Verifica que no sea 'undefined'
-
-// NUEVO LOG: Middleware a nivel de router para ver el path antes de las rutas específicas
-router.use((req, res, next) => {
-    console.log(`[routes/resultados.js] Petición interna recibida: ${req.method} ${req.path}`);
-    next();
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: Number(process.env.DB_PORT || 5432),
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_NAME || process.env.DB_DATABASE || 'paes_db',
 });
 
-// Crear un resultado al comenzar el ensayo
-router.post(
-  '/crear-resultado',
-  verificarToken, 
-  authorizeRoles(['alumno', 'admin']), 
-  async (req, res) => {
-    console.log('--- ENTRANDO A /crear-resultado (ROUTE HANDLER) ---'); // Log para confirmar que se entró al manejador de la ruta
-    console.log('req.body recibido:', req.body); // Nuevo log para ver el cuerpo de la solicitud
-    console.log('req.usuario (después de middlewares):', req.usuario); 
+// Helpers
+function n(x) {
+  const v = Number(x);
+  return Number.isFinite(v) && v > 0 ? v : null;
+}
 
-    if (req.usuario && req.usuario.rol) {
-        console.log('Rol de usuario recibido en ruta:', req.usuario.rol);
+function pickAlumnoId(req) {
+  return (
+    n(req.body?.alumno_id) ??
+    n(req.query?.alumno_id) ??
+    n(req.usuario?.uid) ??   // <- tu verifyToken coloca aquí el payload
+    n(req.user?.uid)         // <- alias de compatibilidad
+  );
+}
+
+function pickEnsayoId(req) {
+  return n(req.body?.ensayo_id) ?? n(req.query?.ensayo_id);
+}
+
+function upperABCD(x) {
+  const s = String(x || '').trim().toUpperCase();
+  return ['A','B','C','D'].includes(s) ? s : null;
+}
+
+function getRole(req) {
+  return (req.usuario?.rol || req.user?.rol || '').toLowerCase();
+}
+
+function isAlumno(req) {
+  return getRole(req) === 'alumno';
+}
+
+function isDocenteOrAdmin(req) {
+  const r = getRole(req);
+  return r === 'docente' || r === 'admin';
+}
+
+/**
+ * alumnoId a consultar, según rol:
+ * - Alumno: SIEMPRE su propio uid (ignora overrides para seguridad).
+ * - Docente/Admin: usa el que venga por body/query si existe; si no viene, devuelve null.
+ */
+function pickAlumnoIdForQuery(req) {
+  if (isAlumno(req)) {
+    return n(req.usuario?.uid) ?? n(req.user?.uid) ?? null;
+  }
+  return n(req.body?.alumno_id) ?? n(req.query?.alumno_id) ?? null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// GET/POST /ver-resultados  (ya lo tenías)
+// ─────────────────────────────────────────────────────────────
+async function verResultadosHandler(req, res) {
+  try {
+    const rol = getRole(req);
+
+    // Alumno: lista SOLO los suyos (uid del token)
+    if (isAlumno(req)) {
+      const alumnoId = n(req.usuario?.uid) ?? n(req.user?.uid);
+      if (!alumnoId) return res.status(401).json({ error: 'invalid_token_payload' });
+
+      const q = await pool.query(
+        `SELECT r.id         AS resultado_id,
+                e.nombre     AS ensayo_nombre,
+                m.nombre     AS materia_nombre,
+                r.puntaje,
+                r.fecha
+           FROM resultados r
+           JOIN ensayos   e ON e.id = r.ensayo_id
+           JOIN materias  m ON m.id = e.materia_id
+          WHERE r.alumno_id = $1
+          ORDER BY r.fecha DESC`,
+        [alumnoId]
+      );
+      return res.json(q.rows);
+    }
+
+    // Docente/Admin: puede filtrar por alumno_id (opcional)
+    const alumnoId = pickAlumnoIdForQuery(req);
+
+    // Puedes decidir la política:
+    // a) Requerir alumno_id para no listar todo el universo:
+    // if (!alumnoId) return res.status(400).json({ error: 'alumno_id requerido para docentes' });
+
+    // b) O permitir listar todo (con datos del alumno). Te dejo ambas variantes:
+    if (alumnoId) {
+      const q = await pool.query(
+        `SELECT r.id         AS resultado_id,
+                e.nombre     AS ensayo_nombre,
+                m.nombre     AS materia_nombre,
+                r.puntaje,
+                r.fecha,
+                u.nombre     AS alumno_nombre,
+                u.correo     AS alumno_correo
+           FROM resultados r
+           JOIN ensayos   e ON e.id = r.ensayo_id
+           JOIN materias  m ON m.id = e.materia_id
+           LEFT JOIN usuarios u ON u.id = r.alumno_id   -- ajusta si tu tabla de usuarios se llama distinto
+          WHERE r.alumno_id = $1
+          ORDER BY r.fecha DESC`,
+        [alumnoId]
+      );
+      return res.json(q.rows);
     } else {
-        console.warn('⚠️ req.usuario o req.usuario.rol no está definido al llegar a la ruta /crear-resultado');
+      // Variante “listar todo” para docentes/admin (si prefieres, comenta esto y usa la opción (a) arriba)
+      const q = await pool.query(
+        `SELECT r.id         AS resultado_id,
+                e.nombre     AS ensayo_nombre,
+                m.nombre     AS materia_nombre,
+                r.puntaje,
+                r.fecha,
+                u.nombre     AS alumno_nombre,
+                u.correo     AS alumno_correo
+           FROM resultados r
+           JOIN ensayos   e ON e.id = r.ensayo_id
+           JOIN materias  m ON m.id = e.materia_id
+           LEFT JOIN usuarios u ON u.id = r.alumno_id
+          ORDER BY r.fecha DESC
+          LIMIT 500`  // evita respuestas gigantes; ajusta según necesidad
+      );
+      return res.json(q.rows);
     }
+  } catch (err) {
+    console.error('💥 /ver-resultados error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
+}
 
-    const alumno_id = req.usuario ? req.usuario.id : null; // Asegurarse de que alumno_id no sea undefined si req.usuario no existe
-    const { ensayo_id } = req.body;
+router.get('/ver-resultados', verResultadosHandler);
+router.post('/ver-resultados', verResultadosHandler);
 
-    console.log(`Verificando datos: alumno_id=${alumno_id}, ensayo_id=${ensayo_id}`); // Nuevo log para ver los valores antes de la validación
-
-    if (req.usuario.rol !== 'alumno' && req.usuario.rol !== 'admin') {
-      console.warn(`❌ Intento de crear resultado por rol no permitido: ${req.usuario.rol}`);
-      return res.status(403).json({ error: 'Solo alumnos o administradores pueden crear resultados' });
-    }
-
-    if (!ensayo_id || !alumno_id) {
-      console.warn('⚠️ Faltan datos para crear resultado: ensayo_id o alumno_id');
+// ─────────────────────────────────────────────────────────────
+// POST /crear-resultado  (ya lo tenías)
+// ─────────────────────────────────────────────────────────────
+router.post('/crear-resultado', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const alumnoId = pickAlumnoId(req);
+    const ensayoId = pickEnsayoId(req);
+    if (!alumnoId || !ensayoId) {
       return res.status(400).json({ error: 'Faltan datos para crear el resultado' });
     }
 
-    try {
-      console.log('Intentando insertar en la base de datos...'); // Nuevo log antes de la consulta
-      const result = await pool.query(
-        `INSERT INTO resultados (ensayo_id, alumno_id)
-         VALUES ($1, $2)
-         RETURNING id`,
-        [ensayo_id, alumno_id]
-      );
+    const ex = await client.query('SELECT id FROM ensayos WHERE id = $1', [ensayoId]);
+    if (!ex.rows.length) return res.status(404).json({ error: 'Ensayo no existe' });
 
-      const resultado_id = result.rows[0].id;
-      console.log(`✅ Resultado creado con ID: ${resultado_id} para alumno ID: ${alumno_id}`);
-      res.status(201).json({ mensaje: 'Resultado creado', resultado_id });
-    } catch (err) {
-      console.error('💥 Error al crear resultado (DB QUERY FAILED):', err); // Más específico
-      res.status(500).json({ error: 'Error interno del servidor al crear resultado', detalle: err.message });
-    }
+    await client.query('BEGIN');
+    const ins = await client.query(
+      `INSERT INTO resultados (ensayo_id, alumno_id, puntaje)
+       VALUES ($1, $2, 0)
+       RETURNING id`,
+      [ensayoId, alumnoId]
+    );
+    await client.query('COMMIT');
+    return res.status(201).json({ resultado_id: ins.rows[0].id });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('💥 /crear-resultado error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
+  }
 });
 
-// NUEVA RUTA: Guardar una respuesta individual del alumno durante el ensayo
-router.post(
-  '/:resultado_id/responder', // La URL será /api/resultados/:resultado_id/responder
-  verificarToken,
-  authorizeRoles(['alumno', 'admin']),
-  async (req, res) => {
-    console.log(`--- ENTRANDO A POST /api/resultados/${req.params.resultado_id}/responder (ROUTE HANDLER) ---`);
-    const { resultado_id } = req.params;
-    const { pregunta_id, respuesta_dada } = req.body; // respuesta_dada será 'A', 'B', 'C', 'D'
-    const alumno_id = req.usuario.id;
+// ─────────────────────────────────────────────────────────────
+// NUEVO: GET /ver-detalle-resultado?resultado_id=123
+// Devuelve la grilla de preguntas + tu respuesta + la correcta + flag correcta
+// Estructura que espera el front:
+// [
+//   {
+//     pregunta_id,
+//     texto,
+//     opcion_a, opcion_b, opcion_c, opcion_d,
+//     respuesta_dada_id,       // 'A'|'B'|'C'|'D' o null
+//     respuesta_correcta_id,   // 'A'|'B'|'C'|'D'
+//     correcta                 // true|false
+//   },
+//   ...
+// ]
+// ─────────────────────────────────────────────────────────────
+router.get('/ver-detalle-resultado', async (req, res) => {
+  const rid = n(req.query?.resultado_id);
+  if (!rid) return res.status(400).json({ error: 'resultado_id requerido' });
 
-    console.log(`Resultado ID: ${resultado_id}, Pregunta ID: ${pregunta_id}, Respuesta Dada: ${respuesta_dada}, Alumno ID: ${alumno_id}`);
+  const rol = getRole(req);
+  const alumnoIdToken = n(req.usuario?.uid) ?? n(req.user?.uid) ?? null;
 
-    if (!pregunta_id || !respuesta_dada) {
-      console.warn('⚠️ Faltan datos para guardar la respuesta.');
-      return res.status(400).json({ error: 'Faltan datos (pregunta_id o respuesta_dada)' });
+  try {
+    // 1) Verifica que el resultado exista (y trae alumno_id + ensayo_id)
+    const qr = await pool.query(
+      'SELECT alumno_id, ensayo_id FROM resultados WHERE id = $1',
+      [rid]
+    );
+    if (!qr.rows.length) return res.status(404).json({ error: 'Resultado no existe' });
+
+    const { alumno_id: alumnoIdDb, ensayo_id: ensayoId } = qr.rows[0];
+
+    // REGLA DE ACCESO:
+    // - Alumno: solo si el resultado es suyo
+    // - Docente/Admin: permitido ver cualquiera
+    if (rol === 'alumno') {
+      if (!alumnoIdToken || alumnoIdDb !== alumnoIdToken) {
+        return res.status(403).json({ error: 'forbidden' });
+      }
     }
 
-    try {
-      console.log(`Verificando resultado ID ${resultado_id} y alumno ID ${alumno_id} en DB.`);
-      // 1. Verificar que el resultado exista y pertenezca al alumno logueado
-      const resultadoCheck = await pool.query(
-        'SELECT ensayo_id FROM resultados WHERE id = $1 AND alumno_id = $2',
-        [resultado_id, alumno_id]
-      );
+    // 2) Traer detalle (sin cambios)
+    const q = await pool.query(
+      `SELECT
+         p.id                        AS pregunta_id,
+         p.enunciado                 AS texto,
+         p.opcion_a, p.opcion_b, p.opcion_c, p.opcion_d,
+         p.respuesta_correcta        AS respuesta_correcta_id,
+         r.respuesta_dada            AS respuesta_dada_id,
+         COALESCE(r.correcta, false) AS correcta
+       FROM ensayo_pregunta ep
+       JOIN preguntas p ON p.id = ep.pregunta_id
+       LEFT JOIN respuestas r
+         ON r.resultado_id = $1
+        AND r.pregunta_id  = p.id
+       WHERE ep.ensayo_id = $2
+       ORDER BY ep.id ASC`,
+      [rid, ensayoId]
+    );
 
-      if (resultadoCheck.rows.length === 0) {
-        console.warn(`❌ Acceso denegado: Resultado ID ${resultado_id} no encontrado o no pertenece a alumno ID ${alumno_id}`);
-        return res.status(403).json({ error: 'Acceso denegado o resultado no encontrado' });
-      }
-      console.log('Resultado y alumno verificados. Obteniendo respuesta correcta de la pregunta.');
-
-      // 2. Obtener la respuesta correcta de la pregunta
-      const preguntaData = await pool.query(
-        'SELECT respuesta_correcta FROM preguntas WHERE id = $1',
-        [pregunta_id]
-      );
-
-      if (preguntaData.rows.length === 0) {
-        console.warn(`⚠️ Pregunta ID ${pregunta_id} no encontrada.`);
-        return res.status(404).json({ error: 'Pregunta no encontrada.' });
-      }
-
-      const es_correcta = (respuesta_dada.toUpperCase() === preguntaData.rows[0].respuesta_correcta.toUpperCase());
-      console.log(`Respuesta correcta para pregunta ${pregunta_id} es ${preguntaData.rows[0].respuesta_correcta}. Respuesta dada: ${respuesta_dada}. ¿Es correcta?: ${es_correcta}`);
-
-      // 3. Insertar o actualizar la respuesta en la tabla 'respuestas'
-      // Usamos ON CONFLICT (UPSERT) para actualizar si la respuesta ya existe para esa pregunta en ese resultado
-      const query = `
-        INSERT INTO respuestas (resultado_id, pregunta_id, respuesta_dada, correcta)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (resultado_id, pregunta_id) DO UPDATE
-        SET respuesta_dada = EXCLUDED.respuesta_dada,
-            correcta = EXCLUDED.correcta
-        RETURNING *;
-      `;
-      const result = await pool.query(query, [resultado_id, pregunta_id, respuesta_dada.toUpperCase(), es_correcta]);
-      
-      console.log(`✅ Respuesta guardada/actualizada para pregunta ID ${pregunta_id}, Resultado ID ${resultado_id}. Correcta: ${es_correcta}`);
-      res.status(200).json({ mensaje: 'Respuesta guardada', respuesta: result.rows[0] });
-
-    } catch (err) {
-      console.error('💥 Error al guardar la respuesta (DB QUERY FAILED):', err);
-      res.status(500).json({ error: 'Error interno del servidor al guardar la respuesta', detalle: err.message });
-    }
+    return res.json(q.rows);
+  } catch (err) {
+    console.error('💥 /ver-detalle-resultado error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
 });
 
+// ─────────────────────────────────────────────────────────────
+// NUEVO: GET /:resultado_id/preguntas-ensayo
+// Devuelve { ensayo: {id,titulo}, preguntas: [...], respuestasPrevias: { [preguntaId]: 'A'|'B'|'C'|'D' } }
+// ─────────────────────────────────────────────────────────────
+router.get('/:resultado_id/preguntas-ensayo', async (req, res) => {
+  const rid = n(req.params?.resultado_id);
+  if (!rid) return res.status(400).json({ error: 'resultado_id inválido' });
 
-// NUEVA RUTA: Finalizar el ensayo y calcular el puntaje final
-router.post(
-  '/:resultado_id/finalizar', // La URL será /api/resultados/:resultado_id/finalizar
-  verificarToken,
-  authorizeRoles(['alumno', 'admin']),
-  async (req, res) => {
-    console.log(`--- ENTRANDO A POST /api/resultados/${req.params.resultado_id}/finalizar (ROUTE HANDLER) ---`);
-    const { resultado_id } = req.params;
-    const alumno_id = req.usuario.id;
+  const alumnoIdToken = pickAlumnoId(req);
 
-    console.log(`Solicitud de finalización para Resultado ID: ${resultado_id} por Alumno ID: ${alumno_id}`);
+  try {
+    // 1) Verifica que el resultado existe y pertenece al alumno
+    const qr = await pool.query(
+      `SELECT r.id, r.alumno_id, r.ensayo_id, e.nombre AS ensayo_nombre
+         FROM resultados r
+         JOIN ensayos   e ON e.id = r.ensayo_id
+        WHERE r.id = $1`,
+      [rid]
+    );
+    if (!qr.rows.length) return res.status(404).json({ error: 'Resultado no existe' });
 
-    try {
-      console.log(`Verificando resultado ID ${resultado_id} y alumno ID ${alumno_id} para finalizar.`);
-      // 1. Verificar que el resultado exista y pertenezca al alumno logueado
-      const resultadoCheck = await pool.query(
-        'SELECT ensayo_id FROM resultados WHERE id = $1 AND alumno_id = $2',
-        [resultado_id, alumno_id]
-      );
-
-      if (resultadoCheck.rows.length === 0) {
-        console.warn(`❌ Acceso denegado: Resultado ID ${resultado_id} no encontrado o no pertenece a alumno ID ${alumno_id}`);
-        return res.status(403).json({ error: 'Acceso denegado o resultado no encontrado' });
-      }
-
-      // 2. Calcular el puntaje total
-      const puntajeResult = await pool.query(
-        'SELECT COUNT(*) FROM respuestas WHERE resultado_id = $1 AND correcta = true',
-        [resultado_id]
-      );
-      const puntaje = parseInt(puntajeResult.rows[0].count);
-      console.log(`Puntaje calculado: ${puntaje} para resultado ID ${resultado_id}.`);
-
-      // 3. Actualizar el puntaje en la tabla 'resultados'
-      await pool.query(
-        'UPDATE resultados SET puntaje = $1 WHERE id = $2 RETURNING *',
-        [puntaje, resultado_id]
-      );
-
-      console.log(`✅ Ensayo finalizado y puntaje (${puntaje}) guardado para Resultado ID: ${resultado_id}`);
-      res.status(200).json({ mensaje: 'Ensayo finalizado y puntaje guardado', puntaje });
-
-    } catch (err) {
-      console.error('💥 Error al finalizar el ensayo (DB QUERY FAILED):', err);
-      res.status(500).json({ error: 'Error interno del servidor al finalizar el ensayo', detalle: err.message });
-    }
-});
-
-// Obtener las preguntas para un ensayo en ejecución
-router.get(
-  '/:resultado_id/preguntas-ensayo', 
-  verificarToken, 
-  authorizeRoles(['alumno', 'admin']), 
-  async (req, res) => {
-    console.log(`--- ENTRANDO A GET /api/resultados/${req.params.resultado_id}/preguntas-ensayo (ROUTE HANDLER) ---`);
-    const { resultado_id } = req.params; 
-    const alumno_id = req.usuario.id; 
-
-    console.log(`Solicitud para resultado ID: ${resultado_id} por alumno ID: ${alumno_id}`);
-
-    if (!resultado_id) {
-      console.warn('⚠️ Falta resultado_id en los parámetros de la URL.');
-      return res.status(400).json({ error: 'Falta el ID del resultado' });
+    const rowR = qr.rows[0];
+    if (alumnoIdToken && rowR.alumno_id !== alumnoIdToken) {
+      return res.status(403).json({ error: 'forbidden' });
     }
 
-    try {
-      console.log(`Verificando resultado ID ${resultado_id} y alumno ID ${alumno_id} en DB.`);
-      // 1. Verificar que el resultado exista y pertenezca al alumno logueado
-      const resultadoCheck = await pool.query(
-        'SELECT ensayo_id FROM resultados WHERE id = $1 AND alumno_id = $2',
-        [resultado_id, alumno_id]
-      );
+    const ensayoId = rowR.ensayo_id;
 
-      if (resultadoCheck.rows.length === 0) {
-        console.warn(`❌ Acceso denegado: Resultado ID ${resultado_id} no encontrado o no pertenece a alumno ID ${alumno_id}`);
-        return res.status(403).json({ error: 'Acceso denegado o resultado no encontrado' });
-      }
-
-      const ensayo_id = resultadoCheck.rows[0].ensayo_id;
-      console.log(`Ensayo ID ${ensayo_id} asociado a resultado ID ${resultado_id}. Obteniendo detalles del ensayo.`);
-
-      // 2. Obtener los detalles del ensayo
-      const ensayoDetails = await pool.query(
-        'SELECT id, nombre AS titulo, fecha_creacion, docente_id, materia_id FROM ensayos WHERE id = $1', 
-        [ensayo_id]
-      );
-
-      if (ensayoDetails.rows.length === 0) {
-        console.warn(`❌ Ensayo ID ${ensayo_id} no encontrado para el resultado ${resultado_id}.`);
-        return res.status(404).json({ error: 'Ensayo asociado no encontrado' });
-      }
-      const ensayo = ensayoDetails.rows[0];
-      console.log(`Detalles del ensayo obtenidos: ${JSON.stringify(ensayo)}`);
-      console.log('Obteniendo preguntas asociadas al ensayo.');
-
-      // 3. Obtener las preguntas asociadas a este ensayo y sus opciones
-      const preguntasRaw = await pool.query(`
-        SELECT
-            p.id AS pregunta_id,
-            p.enunciado AS texto, 
-            p.opcion_a,
-            p.opcion_b,
-            p.opcion_c,
-            p.opcion_d,
-            p.respuesta_correcta 
-        FROM ensayo_pregunta ep 
-        JOIN preguntas p ON ep.pregunta_id = p.id
+    // 2) Trae preguntas del ensayo
+    const qp = await pool.query(
+      `SELECT p.id,
+              p.enunciado,
+              p.opcion_a, p.opcion_b, p.opcion_c, p.opcion_d
+         FROM ensayo_pregunta ep
+         JOIN preguntas p ON p.id = ep.pregunta_id
         WHERE ep.ensayo_id = $1
-        ORDER BY p.id 
-      `, [ensayo_id]);
-      console.log(`Preguntas raw obtenidas: ${preguntasRaw.rows.length} preguntas.`);
+        ORDER BY ep.id ASC`,
+      [ensayoId]
+    );
 
-      // 4. Formatear las preguntas para que el frontend las entienda fácilmente
-      const preguntasFormateadas = preguntasRaw.rows.map(row => {
-        const opciones = [];
-        if (row.opcion_a) opciones.push({ id: 'A', texto: row.opcion_a });
-        if (row.opcion_b) opciones.push({ id: 'B', texto: row.opcion_b });
-        if (row.opcion_c) opciones.push({ id: 'C', texto: row.opcion_c });
-        if (row.opcion_d) opciones.push({ id: 'D', texto: row.opcion_d });
+    const preguntas = qp.rows.map(p => ({
+      id: p.id,
+      texto: p.enunciado,
+      opciones: [
+        { id: 'A', texto: p.opcion_a },
+        { id: 'B', texto: p.opcion_b },
+        { id: 'C', texto: p.opcion_c },
+        { id: 'D', texto: p.opcion_d },
+      ],
+    }));
 
-        return {
-          id: row.pregunta_id,
-          texto: row.texto, 
-          tipo: 'multiple-choice', 
-          opciones: opciones
-        };
-      });
-      console.log('Preguntas formateadas.');
-
-      // Recuperar respuestas previas si el usuario ya ha respondido
-      console.log('Recuperando respuestas previas para el resultado.');
-      const respuestasPreviasRaw = await pool.query(
-          'SELECT pregunta_id, respuesta_dada FROM respuestas WHERE resultado_id = $1', 
-          [resultado_id]
-      );
-      const respuestasPrevias = respuestasPreviasRaw.rows.reduce((acc, row) => {
-          acc[row.pregunta_id] = row.respuesta_dada; 
-          return acc;
-      }, {});
-      console.log(`Respuestas previas recuperadas: ${Object.keys(respuestasPrevias).length} respuestas.`);
-
-
-      console.log(`✅ Preguntas obtenidas para Ensayo ID ${ensayo_id}, Resultado ID ${resultado_id}. Total: ${preguntasFormateadas.length} preguntas.`);
-      res.status(200).json({
-        ensayo: ensayo,
-        preguntas: preguntasFormateadas,
-        respuestasPrevias: respuestasPrevias
-      });
-
-    } catch (err) {
-      console.error('💥 Error en GET /api/resultados/:resultado_id/preguntas-ensayo (DB QUERY FAILED):', err);
-      res.status(500).json({ error: 'Error del servidor al obtener preguntas del ensayo', detalle: err.message });
+    // 3) Respuestas previas del alumno en este resultado (si existen)
+    const qprev = await pool.query(
+      `SELECT pregunta_id, respuesta_dada
+         FROM respuestas
+        WHERE resultado_id = $1`,
+      [rid]
+    );
+    const respuestasPrevias = {};
+    for (const r of qprev.rows) {
+      respuestasPrevias[r.pregunta_id] = r.respuesta_dada;
     }
+
+    return res.json({
+      ensayo: { id: ensayoId, titulo: rowR.ensayo_nombre }, // el front espera "titulo"
+      preguntas,
+      respuestasPrevias,
+    });
+  } catch (err) {
+    console.error('💥 /:resultado_id/preguntas-ensayo error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  }
 });
 
+// ─────────────────────────────────────────────────────────────
+// NUEVO: POST /:resultado_id/responder
+// Body: { pregunta_id, respuesta_dada: 'A'|'B'|'C'|'D' }
+// Guarda/actualiza la respuesta y marca "correcta" según la pregunta.
+// ─────────────────────────────────────────────────────────────
+router.post('/:resultado_id/responder', async (req, res) => {
+  const rid = n(req.params?.resultado_id);
+  const preguntaId = n(req.body?.pregunta_id);
+  const resp = upperABCD(req.body?.respuesta_dada);
 
-// Ver todos los resultados de un alumno (solo los suyos)
-router.get('/ver-resultados', verificarToken, authorizeRoles(['alumno', 'admin']), async (req, res) => {
-    console.log('--- ENTRANDO A GET /api/resultados/ver-resultados (ROUTE HANDLER ALUMNO) ---');
-    const alumno_id = req.usuario.id; 
-    console.log(`Solicitud de ver resultados para alumno ID: ${alumno_id}`);
+  if (!rid || !preguntaId || !resp) {
+    return res.status(400).json({ error: 'Datos inválidos (resultado_id, pregunta_id, respuesta_dada)' });
+  }
 
-    if (!alumno_id) {
-        console.warn('⚠️ Falta alumno_id para ver resultados (no en el token).');
-        return res.status(400).json({ error: 'Falta el alumno_id' });
+  const alumnoIdToken = pickAlumnoId(req);
+  const client = await pool.connect();
+
+  try {
+    await client.query('BEGIN');
+
+    // Verifica ownership del resultado
+    const qr = await client.query(
+      'SELECT alumno_id FROM resultados WHERE id = $1',
+      [rid]
+    );
+    if (!qr.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Resultado no existe' });
+    }
+    if (alumnoIdToken && qr.rows[0].alumno_id !== alumnoIdToken) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'forbidden' });
     }
 
-    try {
-        console.log(`Consultando resultados de la base de datos para alumno ID: ${alumno_id}`);
-        // Incluir el conteo de preguntas del ensayo para el cálculo "correctas/totales"
-        const result = await pool.query(`
-            SELECT 
-                r.id AS resultado_id, 
-                e.nombre AS ensayo_nombre, 
-                m.nombre AS materia_nombre,
-                r.puntaje, 
-                r.fecha AS fecha,
-                (SELECT COUNT(*) FROM ensayo_pregunta ep WHERE ep.ensayo_id = e.id) AS total_preguntas
-            FROM resultados r
-            JOIN ensayos e ON r.ensayo_id = e.id
-            JOIN materias m ON e.materia_id = m.id
-            WHERE r.alumno_id = $1
-            ORDER BY r.fecha DESC 
-        `, [alumno_id]);
-        console.log(`✅ Resultados obtenidos para alumno ID: ${alumno_id}. Cantidad: ${result.rows.length}`);
-        res.json(result.rows);
-    } catch (err) {
-        console.error('💥 Error al obtener los resultados:', err);
-        res.status(500).json({ error: 'Error al obtener los resultados', detalle: err.message });
+    // Obtiene la respuesta correcta de la pregunta
+    const qp = await client.query(
+      'SELECT respuesta_correcta FROM preguntas WHERE id = $1',
+      [preguntaId]
+    );
+    if (!qp.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Pregunta no existe' });
     }
+    const correcta = (qp.rows[0].respuesta_correcta || '').toUpperCase() === resp;
+
+    // UPSERT en respuestas
+    await client.query(
+      `INSERT INTO respuestas (resultado_id, pregunta_id, respuesta_dada, correcta)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (resultado_id, pregunta_id)
+       DO UPDATE SET respuesta_dada = EXCLUDED.respuesta_dada,
+                     correcta       = EXCLUDED.correcta`,
+      [rid, preguntaId, resp, correcta]
+    );
+
+    await client.query('COMMIT');
+    return res.json({ ok: true, correcta });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('💥 /:resultado_id/responder error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
+  }
 });
 
-// NUEVA RUTA: Ver resultados para docentes (todos o filtrados)
-router.get('/ver-resultados-docente', verificarToken, authorizeRoles(['docente', 'admin']), async (req, res) => {
-    console.log('--- ENTRANDO A GET /api/resultados/ver-resultados-docente (ROUTE HANDLER DOCENTE) ---');
-    const { alumno_id, ensayo_id, materia_id } = req.query; // Parámetros de filtro opcionales
-    const docente_solicitante_id = req.usuario.id; // ID del docente o admin que hace la solicitud
+// ─────────────────────────────────────────────────────────────
+// NUEVO: POST /:resultado_id/finalizar
+// Recalcula el puntaje = cantidad de respuestas correctas.
+// ─────────────────────────────────────────────────────────────
+router.post('/:resultado_id/finalizar', async (req, res) => {
+  const rid = n(req.params?.resultado_id);
+  if (!rid) return res.status(400).json({ error: 'resultado_id inválido' });
 
-    let baseQuery = `
-        SELECT 
-            r.id AS resultado_id, 
-            e.nombre AS ensayo_nombre, 
-            m.nombre AS materia_nombre,
-            u.nombre AS alumno_nombre, -- Nombre del alumno
-            u.correo AS alumno_correo, -- Correo del alumno
-            r.puntaje, 
-            r.fecha,
-            (SELECT COUNT(*) FROM ensayo_pregunta ep WHERE ep.ensayo_id = e.id) AS total_preguntas
-        FROM resultados r
-        JOIN ensayos e ON r.ensayo_id = e.id
-        JOIN materias m ON e.materia_id = m.id
-        JOIN usuarios u ON r.alumno_id = u.id
-    `;
-    const conditions = [];
-    const values = [];
-    let paramIndex = 1;
+  const alumnoIdToken = pickAlumnoId(req);
+  const client = await pool.connect();
 
-    console.log(`Solicitud de resultados para docentes. Filtros: Alumno=${alumno_id}, Ensayo=${ensayo_id}, Materia=${materia_id}`);
+  try {
+    await client.query('BEGIN');
 
-    if (alumno_id) {
-        conditions.push(`r.alumno_id = $${paramIndex++}`);
-        values.push(alumno_id);
+    // Verifica ownership
+    const qr = await client.query(
+      'SELECT alumno_id FROM resultados WHERE id = $1',
+      [rid]
+    );
+    if (!qr.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Resultado no existe' });
     }
-    if (ensayo_id) {
-        conditions.push(`r.ensayo_id = $${paramIndex++}`);
-        values.push(ensayo_id);
-    }
-    if (materia_id) {
-        conditions.push(`m.id = $${paramIndex++}`); // Filtrar por ID de materia
-        values.push(materia_id);
-    }
-    
-    // CAMBIO CLAVE AQUÍ: Se ELIMINA/COMENTA la restricción para docentes
-    // para que puedan ver resultados de TODOS los ensayos, no solo los suyos.
-    /*
-    if (req.usuario.rol === 'docente') {
-        conditions.push(`e.docente_id = $${paramIndex++}`);
-        values.push(docente_solicitante_id);
-    }
-    */
-
-    if (conditions.length > 0) {
-        baseQuery += ' WHERE ' + conditions.join(' AND ');
+    if (alumnoIdToken && qr.rows[0].alumno_id !== alumnoIdToken) {
+      await client.query('ROLLBACK');
+      return res.status(403).json({ error: 'forbidden' });
     }
 
-    baseQuery += ' ORDER BY r.fecha DESC, u.nombre ASC'; // Ordenar por fecha y luego por nombre de alumno
+    // Cuenta correctas
+    const qc = await client.query(
+      `SELECT COUNT(*)::int AS correctas
+         FROM respuestas
+        WHERE resultado_id = $1 AND correcta = true`,
+      [rid]
+    );
+    const puntaje = qc.rows[0].correctas || 0;
 
-    try {
-        const result = await pool.query(baseQuery, values);
-        console.log(`✅ Resultados obtenidos para docentes. Cantidad: ${result.rows.length}`);
-        res.json(result.rows);
-    } catch (err) {
-        console.error('💥 Error al obtener los resultados para docentes:', err);
-        res.status(500).json({ error: 'Error al obtener los resultados', detalle: err.message });
-    }
+    await client.query(
+      'UPDATE resultados SET puntaje = $1, fecha = NOW() WHERE id = $2',
+      [puntaje, rid]
+    );
+
+    await client.query('COMMIT');
+    return res.json({ ok: true, puntaje });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('💥 /:resultado_id/finalizar error:', err);
+    return res.status(500).json({ error: 'server_error' });
+  } finally {
+    client.release();
+  }
 });
 
+/* ==================== Endpoints “docente” (wrappers) ==================== */
+async function verResultadosDocenteWrapper(req, res) {
+  if (!isDocenteOrAdmin(req)) {
+    return res.status(403).json({ error: 'forbidden' });
+  }
+  // Reusa el handler general (ya soporta docente/admin y alumno_id opcional)
+  return verResultadosHandler(req, res);
+}
 
-// Ver detalle de un resultado específico
-router.get('/ver-detalle-resultado', verificarToken, authorizeRoles(['alumno', 'docente', 'admin']), async (req, res) => {
-    console.log('--- ENTRANDO A GET /api/resultados/ver-detalle-resultado (ROUTE HANDLER) ---');
-    const resultado_id = req.query.resultado_id; // Se usa req.query para parámetros de consulta, no params
-    const usuario_id = req.usuario.id; // El ID del usuario que solicita el detalle
-    const usuario_rol = req.usuario.rol; // Rol del usuario que solicita el detalle
+router.get('/ver-resultados-docente', verResultadosDocenteWrapper);
+router.post('/ver-resultados-docente', verResultadosDocenteWrapper);
 
-    console.log(`Solicitud de ver detalle de resultado para resultado ID: ${resultado_id} por Usuario ID: ${usuario_id}, Rol: ${usuario_rol}`);
-
-    if (!resultado_id) {
-        console.warn('⚠️ Falta resultado_id para ver detalle.');
-        return res.status(400).json({ error: 'Falta el resultado_id' });
-    }
-
-    try {
-        // Validación de autorización:
-        // - Si es alumno, debe ser su propio resultado.
-        // - Si es docente, ahora podrá ver cualquier resultado.
-        // - Si es admin, puede ver cualquier resultado.
-
-        let verificacionQuery;
-        let verificacionValues;
-
-        if (usuario_rol === 'alumno') {
-            // Un alumno solo puede ver su propio resultado
-            verificacionQuery = 'SELECT ensayo_id FROM resultados WHERE id = $1 AND alumno_id = $2';
-            verificacionValues = [resultado_id, usuario_id];
-        } else if (usuario_rol === 'docente' || usuario_rol === 'admin') {
-            // UNIFICADO: Docentes y admins pueden ver cualquier detalle de resultado
-            // Ya no se filtra por el docente_id del ensayo aquí.
-            verificacionQuery = 'SELECT ensayo_id FROM resultados WHERE id = $1';
-            verificacionValues = [resultado_id];
-        } 
-        // No hay 'else' para otros roles ya que authorizeRoles ya filtra quién puede llegar aquí.
-
-        const verificacion = await pool.query(verificacionQuery, verificacionValues);
-
-        if (verificacion.rows.length === 0) {
-            console.warn(`❌ Acceso denegado a detalle de resultado. Resultado ID: ${resultado_id}, Usuario ID: ${usuario_id}, Rol: ${usuario_rol}`);
-            return res.status(403).json({ error: 'Acceso denegado: Este resultado no te pertenece o no tienes permiso para verlo.' });
-        }
-        console.log('Propiedad del resultado verificada. Obteniendo detalle de preguntas.');
-
-        const result = await pool.query(`
-            SELECT
-                p.id AS pregunta_id,
-                p.enunciado AS texto, 
-                p.opcion_a AS opcion_a, 
-                p.opcion_b AS opcion_b,
-                p.opcion_c AS opcion_c,
-                p.opcion_d AS opcion_d,
-                p.respuesta_correcta AS respuesta_correcta_id, 
-                r.respuesta_dada AS respuesta_dada_id, 
-                r.correcta 
-            FROM respuestas r 
-            JOIN preguntas p ON r.pregunta_id = p.id
-            WHERE r.resultado_id = $1
-            ORDER BY p.id
-        `, [resultado_id]);
-        console.log(`✅ Detalle de resultado obtenido para resultado ID: ${resultado_id}. Cantidad de preguntas: ${result.rows.length}`);
-        res.json(result.rows);
-    } catch (err) {
-        console.error('💥 Error al obtener detalle del resultado (DB QUERY FAILED):', err);
-        res.status(500).json({ error: 'Error al obtener detalle del resultado', detalle: err.message });
-    }
-});
 
 module.exports = router;

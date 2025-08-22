@@ -1,4 +1,3 @@
-version: "3.9"
 
 ########################
 # 1)   anclajes comunes #
@@ -9,6 +8,7 @@ x-db-env: &db-env
   DB_USER: ${DB_USER:-user}
   DB_PASSWORD: ${DB_PASSWORD:-password}
   DB_NAME: ${DB_NAME:-paes_db}
+  DB_DATABASE: ${DB_NAME:-paes_db}
   JWT_SECRET: superSecret123
 
 x-restart: &always
@@ -56,9 +56,8 @@ services:
       dockerfile: ./services/_common/Dockerfile
       args:
         SERVICE: services/auth
-    environment:
-      <<: *db-env
-      PORT: 5001
+    env_file:
+      - ./services/auth/.env
 
   preguntas-service:
     <<: *service-base
