@@ -1,5 +1,11 @@
 Se continuara trabajando en este proyecto, con un integrante nuevo el cual es Lucas Morrison.
 
+Integrantes:
+Agustin Santibañez | 
+Diego Sierra       | 202273531-7
+Daniel Ruiz        | 
+Lucas Morrison     | 
+
 Proyecto de Ensayos PAES: Plataforma de Evaluación Educativa
 Este repositorio contiene la implementación de una plataforma para la gestión y realización de ensayos de preparación académica, utilizando una arquitectura de microservicios. Nuestro objetivo es proporcionar una herramienta robusta para estudiantes y docentes.
 
