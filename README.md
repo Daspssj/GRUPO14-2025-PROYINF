@@ -8,7 +8,7 @@ Diego Sierra       | 202273531-7
 
 Daniel Ruiz        | 202273525-2
 
-Lucas Morrison     | 
+Lucas Morrison     | 202273547-3
 
 
 Proyecto de Ensayos PAES: Plataforma de Evaluación Educativa
