@@ -1,6 +1,7 @@
 Se continuara trabajando en este proyecto, con un integrante nuevo el cual es Lucas Morrison.
 
 Integrantes:
+
 Agustin Santibañez | 
 
 Diego Sierra       | 202273531-7
