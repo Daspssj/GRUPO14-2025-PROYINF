@@ -1,0 +1,202 @@
+openapi: 3.0.3
+info:
+  title: PAES API Gateway — HU-011 Colegios & Cursos
+  version: 1.0.0
+  description: >
+    Especificación mínima de endpoints para la HU-011 (Onboarding/Wizard):
+    Colegios, Cursos y Membresías. Autenticación vía Bearer JWT.
+
+servers:
+  - url: http://localhost:8080
+    description: Local Gateway
+
+tags:
+  - name: Colegios
+  - name: Cursos
+  - name: Membresías
+
+security:
+  - BearerAuth: []
+
+paths:
+  /api/colegios:
+    get:
+      tags: [Colegios]
+      summary: Buscar colegios (normalizado y paginado)
+      parameters:
+        - in: query
+          name: query
+          required: false
+          schema: { type: string }
+          description: Texto a buscar (case/tildes-insensitive)
+        - in: query
+          name: page
+          required: false
+          schema: { type: integer, default: 1, minimum: 1 }
+        - in: query
+          name: pageSize
+          required: false
+          schema: { type: integer, default: 10, minimum: 1, maximum: 100 }
+      responses:
+        '200':
+          description: Lista de colegios
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Colegio' }
+                  meta: { $ref: '#/components/schemas/Paginacion' }
+    post:
+      tags: [Colegios]
+      summary: Crear colegio (con control de duplicados/sugerencias)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombre]
+              properties:
+                nombre: { type: string, minLength: 2 }
+                comuna: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Colegio creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Colegio' }
+        '409':
+          description: Posible duplicado (sugerencias)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conflicto: { type: string }
+                  sugerencias:
+                    type: array
+                    items: { $ref: '#/components/schemas/Colegio' }
+
+  /api/cursos:
+    get:
+      tags: [Cursos]
+      summary: Listar/filtrar cursos de un colegio
+      parameters:
+        - in: query
+          name: colegioId
+          required: true
+          schema: { type: integer, minimum: 1 }
+        - in: query
+          name: query
+          required: false
+          schema: { type: string }
+          description: Filtro por nombre/año/sección
+      responses:
+        '200':
+          description: Lista de cursos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Curso' }
+    post:
+      tags: [Cursos]
+      summary: Crear curso (auto-membresía del creador)
+      description: |
+        En wizard se permite creación por alumno (marcado “Demo only” en UI).
+        Rol en curso se infiere desde el rol global del usuario autenticado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [colegioId, nombre]
+              properties:
+                colegioId: { type: integer, minimum: 1 }
+                nombre: { type: string, minLength: 2 }
+                anio: { type: integer, nullable: true }
+                seccion: { type: string, nullable: true }
+      responses:
+        '201':
+          description: Curso creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Curso' }
+        '409':
+          description: Posible duplicado (curso similar en el colegio)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conflicto: { type: string }
+                  sugerencias:
+                    type: array
+                    items: { $ref: '#/components/schemas/Curso' }
+
+  /api/cursos/{cursoId}/unirse:
+    post:
+      tags: [Membresías]
+      summary: Unirse a un curso
+      parameters:
+        - in: path
+          name: cursoId
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: Membresía creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CursoMiembro' }
+        '409':
+          description: Ya pertenece al curso
+
+  /api/mi/cursos:
+    get:
+      tags: [Membresías]
+      summary: Listar cursos del usuario (membresías)
+      responses:
+        '200':
+          description: Membresías del usuario
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CursoMiembro' }
+
+  /api/curso_miembros/{id}:
+    delete:
+      tags: [Membresías]
+      summary: Salir de un curso
+      description: |
+        Solo permitido si el usuario no posee resultados asociados al curso
+        y no existen ventanas activas que lo afecten.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '204':
+          description: Eliminado
+        '409':
+          description: No permitido por integridad (resultados o ventanas activas)
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Paginacion:
+      type: object
+      properties:
+        page: { type: integer, example: 1 }
+        pageSize: { type: integer, exam

@@ -1,5 +1,3 @@
-version: "3.9"
-
 ########################
 # 1)   anclajes comunes #
 ########################
@@ -9,7 +7,9 @@ x-db-env: &db-env
   DB_USER: ${DB_USER:-user}
   DB_PASSWORD: ${DB_PASSWORD:-password}
   DB_NAME: ${DB_NAME:-paes_db}
+  DB_DATABASE: ${DB_NAME:-paes_db}
   JWT_SECRET: superSecret123
+  JWT_ISSUER: ${JWT_ISSUER:-paes-auth} # <-- AÑADIDO AQUÍ
 
 x-restart: &always
   restart: unless-stopped
@@ -49,13 +49,15 @@ services:
 
   # ---------- micro-servicios ----------
   auth-service:
-    <<: *service-base # Aplica las propiedades comunes
+    <<: *service-base
     container_name: paes-auth
-    build: 
+    build:
       context: .
       dockerfile: ./services/_common/Dockerfile
       args:
         SERVICE: services/auth
+    env_file:
+      - ./services/auth/.env
     environment:
       <<: *db-env
       PORT: 5001
@@ -71,8 +73,6 @@ services:
     environment:
       <<: *db-env
       PORT: 5002
-  
-  # ... y así sucesivamente para los demás servicios ...
 
   ensayos-service:
     <<: *service-base
@@ -122,6 +122,18 @@ services:
       <<: *db-env
       PORT: 5006
 
+  # --- NUEVO SERVICIO (AHORA CONSISTENTE) ---
+  colegios-cursos-service:
+    <<: *service-base
+    container_name: colegios-cursos-service
+    build:
+      context: ./services/colegios-cursos
+    environment:
+      <<: *db-env
+      PORT: 5007
+    ports: # Mantenemos el puerto expuesto para debugging si es necesario
+      - "5007:5007"
+
   # ---------- API-Gateway (NGINX) ----------
   gateway:
     build:
@@ -137,6 +149,7 @@ services:
       - resultados-service
       - materias-service
       - respuestas-service
+      - colegios-cursos-service # <-- AÑADIDO A DEPENDS_ON
     networks: [paes_net]
     <<: *always
 

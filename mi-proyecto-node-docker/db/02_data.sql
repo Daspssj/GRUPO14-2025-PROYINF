@@ -1,14 +1,7 @@
---
--- Datos iniciales y de respaldo para la base de datos
--- Se ejecuta DESPUÉS de 01_schema.sql para poblar las tablas.
---
-
+-- 02_data.sql
 SET client_encoding = 'UTF8';
 
---
--- Data for Name: usuarios; Type: TABLE DATA; Schema: public; Owner: user
---
-
+-- Usuarios locales (auth_origen='local' por DEFAULT; contraseñas hash de ejemplo)
 COPY public.usuarios (id, nombre, correo, contrasena, rol) FROM stdin;
 1	Juan Perez	juan@correo.com	$2a$10$EXAMPLEHASHFORJUANPEREZ1234567890123456789012345678901234567890	docente
 2	Camila Yael Loayza Arredondo	caca@gmail.com	$2a$10$EXAMPLEHASHFORCAMILA1234567890123456789012345678901234567890	alumno
@@ -16,11 +9,7 @@ COPY public.usuarios (id, nombre, correo, contrasena, rol) FROM stdin;
 4	alicia	ali@gmail.com	$2a$10$EXAMPLEHASHFORALICIA1234567890123456789012345678901234567890	docente
 \.
 
-
---
--- Data for Name: materias; Type: TABLE DATA; Schema: public; Owner: user
---
-
+-- Materias
 COPY public.materias (id, nombre) FROM stdin;
 1	Lenguaje
 2	Matematicas1
@@ -31,14 +20,25 @@ COPY public.materias (id, nombre) FROM stdin;
 7	Historia y ciencias sociales
 \.
 
-
---
--- Data for Name: ensayos; Type: TABLE DATA; Schema: public; Owner: user
---
-
+-- Ensayos (docente_id=4 existe arriba)
 COPY public.ensayos (id, nombre, fecha_creacion, docente_id, materia_id) FROM stdin;
 1	Ensayo Lenguaje Prueba1	2025-06-13	4	1
 \.
+
+-- Usuarios ejemplo vía Google (contraseña NULL, correo verificado, auth_origen='google')
+INSERT INTO public.usuarios (id, nombre, correo, contrasena, rol, avatar_url, correo_verificado, auth_origen)
+VALUES
+  (5, 'Valentina Google', 'valentina.oauth@demo.com', NULL, 'alumno',  'https://example.com/val.png', TRUE, 'google'),
+  (6, 'Diego OAuth',      'diego.oauth@demo.com',     NULL, 'alumno',  'https://example.com/die.png', TRUE, 'google'),
+  (7, 'Profe Google',     'profesor.oauth@demo.com',  NULL, 'docente', 'https://example.com/pro.png', TRUE, 'google')
+ON CONFLICT (correo) DO NOTHING;
+
+INSERT INTO public.usuario_proveedores (usuario_id, proveedor, proveedor_uid)
+VALUES
+  ((SELECT id FROM public.usuarios WHERE correo='valentina.oauth@demo.com'), 'google', 'google-sub-VAL-001'),
+  ((SELECT id FROM public.usuarios WHERE correo='diego.oauth@demo.com'),     'google', 'google-sub-DIE-002'),
+  ((SELECT id FROM public.usuarios WHERE correo='profesor.oauth@demo.com'),  'google', 'google-sub-PRO-003')
+ON CONFLICT (proveedor, proveedor_uid) DO NOTHING;
 
 
 --
@@ -324,51 +324,12 @@ COPY public.resultados (id, ensayo_id, alumno_id, puntaje, fecha) FROM stdin;
 COPY public.respuestas (id, resultado_id, pregunta_id, respuesta_dada, correcta) FROM stdin;
 \.
 
+-- Alinear TODAS las secuencias al valor máximo actual (evita PK duplicadas)
+SELECT setval('public.usuarios_id_seq',          (SELECT COALESCE(MAX(id),1) FROM public.usuarios), TRUE);
+SELECT setval('public.materias_id_seq',          (SELECT COALESCE(MAX(id),1) FROM public.materias), TRUE);
+SELECT setval('public.preguntas_id_seq',         (SELECT COALESCE(MAX(id),1) FROM public.preguntas), TRUE);
+SELECT setval('public.ensayos_id_seq',           (SELECT COALESCE(MAX(id),1) FROM public.ensayos), TRUE);
+SELECT setval('public.ensayo_pregunta_id_seq',   (SELECT COALESCE(MAX(id),1) FROM public.ensayo_pregunta), TRUE);
+SELECT setval('public.resultados_id_seq',        (SELECT COALESCE(MAX(id),1) FROM public.resultados), TRUE);
+SELECT setval('public.respuestas_id_seq',        (SELECT COALESCE(MAX(id),1) FROM public.respuestas), TRUE);
 
---
--- Name: ensayo_pregunta_id_seq; Type: SEQUENCE SET; Schema: public; Owner: user
---
-
-SELECT pg_catalog.setval('public.ensayo_pregunta_id_seq', 25, true);
-
-
---
--- Name: ensayos_id_seq; Type: SEQUENCE SET; Schema: public; Owner: user
---
-
-SELECT pg_catalog.setval('public.ensayos_id_seq', 1, true);
-
-
---
--- Name: materias_id_seq; Type: SEQUENCE SET; Schema: public; Owner: user
---
-
-SELECT pg_catalog.setval('public.materias_id_seq', 7, true);
-
-
---
--- Name: preguntas_id_seq; Type: SEQUENCE SET; Schema: public; Owner: user
---
-
-SELECT pg_catalog.setval('public.preguntas_id_seq', 587, true);
-
-
---
--- Name: respuestas_id_seq; Type: SEQUENCE SET; Schema: public; Owner: user
---
-
-SELECT pg_catalog.setval('public.respuestas_id_seq', 1, false);
-
-
---
--- Name: resultados_id_seq; Type: SEQUENCE SET; Schema: public; Owner: user
---
-
-SELECT pg_catalog.setval('public.resultados_id_seq', 1, false);
-
-
---
--- Name: usuarios_id_seq; Type: SEQUENCE SET; Schema: public; Owner: user
---
-
-SELECT pg_catalog.setval('public.usuarios_id_seq', 4, true);

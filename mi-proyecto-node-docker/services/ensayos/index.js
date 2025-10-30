@@ -1,59 +1,30 @@
-// index.js ─ Plantilla común para todos los micro‑servicios
-// ───────────────────────────────────────────────────────
-// ▸ Copia este archivo dentro de cada carpeta de servicio
-// ▸ Ajusta sólo 2 cosas:
-//      1. ensayos (sólo para el log /health)
-//      2. La importación de las rutas de ese servicio
-//         (p. ej.: const routes = require('./routes/ensayos');)
-//
-// Si tu servicio **no** necesita rutas públicas, deja PUBLIC_PATHS vacío
-// o comenta completamente la verificación de JWT.
+// services/ensayos/index.js (VERSIÓN CORREGIDA Y SIMPLIFICADA)
 
 require('dotenv').config();
-
 const express = require('express');
-const cors    = require('cors');
-const verify  = require('../_common/middleware/verifyToken');
+const cors = require('cors');
+const verifyToken = require('../_common/middleware/verifyToken');
+const ensayosRoutes = require('./routes/ensayos');
 
-// 🔄  Ajusta la siguiente línea al archivo de rutas
-//     de **este** servicio (ej.: './routes/ensayos')
-const routes  = require('./routes/ensayos');
-
-// ───────────── Config genérica ─────────────
-const ensayos = process.env.ensayos || 'ensayos-service';
-const PORT         = process.env.PORT        || 5003;           // cada contenedor expone su puerto
-
-/**
- *  Rutas públicas (NO exigen JWT) para este micro‑servicio.
- *  Usa el path tal cual lo recibe Express **dentro** del contenedor.
- *  Si montas las rutas con `app.use('/api', routes)`, entonces será
- *  '/api/login' y no '/login'.
- */
-const PUBLIC_PATHS = [
-  '/health',        // ping de vida
-];
-
-// ───────────── App base ─────────────
 const app = express();
+const PORT = process.env.PORT || 5003;
+const SERVICE_NAME = 'ensayos-service';
+
+// --- Middlewares Globales ---
+// 1. CORS: Permite peticiones de otros orígenes.
+app.use(cors());
+// 2. Body Parser: INDISPENSABLE para leer req.body en peticiones POST/PUT.
 app.use(express.json());
 
-// ───────────── Middleware de bypass JWT ─────────────
-app.use((req, res, next) => {
-  // ¿la ruta solicitada está en la lista de públicas?
-  if (PUBLIC_PATHS.includes(req.path)) {
-    return next(); // acceso libre
-  }
-  // para servicios de solo‑ensayos podrías comentar esta línea ↓
-  return verify(req, res, next); // exige y verifica JWT
-});
+// --- Rutas ---
+// Ruta de salud pública (se define ANTES de la autenticación).
+app.get('/health', (req, res) => res.status(200).json({ ok: true, service: SERVICE_NAME }));
 
-// Endpoint de salud (útil para docker‑compose healthcheck)
-app.get('/health', (_, res) => res.json({ ok: true, service: ensayos }));
+// Para el resto de las rutas, primero aplicamos el middleware de verificación de token
+// y LUEGO montamos todas las rutas de negocio.
+app.use('/', verifyToken, ensayosRoutes);
 
-// Rutas de negocio de este micro‑servicio
-app.use('/', routes);
-
-// ───────────── Lanzar servidor ─────────────
+// --- Iniciar servidor ---
 app.listen(PORT, () => {
-  console.log(`[${ensayos}] escuchando en puerto ${PORT}`);
+    console.log(`[${SERVICE_NAME}] escuchando en puerto ${PORT}`);
 });

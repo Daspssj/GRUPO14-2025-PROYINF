@@ -1,185 +1,192 @@
-Se continuara trabajando en este proyecto, con un integrante nuevo el cual es Lucas Morrison.
+# Proyecto de Ensayos PAES — Plataforma de Evaluación Educativa
 
-Integrantes:
+Plataforma para gestionar y rendir ensayos de preparación académica (PAES), pensada para estudiantes y docentes. Arquitectura basada en microservicios con un **API Gateway (Nginx)**, **backend Node.js/Express**, **PostgreSQL** y **frontend React**.
 
-Agustin Santibañez | 202204682-1
+## Tecnologías Clave
 
-Diego Sierra       | 202273531-7
+* **API Gateway:** Nginx (reverse proxy, CORS, headers, compresión)
+* **Backend:** Node.js + Express (microservicios: auth, materias, preguntas, ensayos, resultados, respuestas)
+* **Base de Datos:** PostgreSQL
+* **Frontend:** React
+* **Orquestación:** Docker Compose
 
-Daniel Ruiz        | 202273525-2
+---
 
-Lucas Morrison     | 202273547-3
+### Ruteo (Gateway → Servicios)
 
+| Ruta pública       | Servicio interno      | Puerto |
+| ------------------ | --------------------- | ------ |
+| `/api/auth/`       | `auth-service`        | 5001   |
+| `/api/preguntas/`  | `preguntas-service`   | 5002   |
+| `/api/ensayos/`    | `ensayos-service`     | 5003   |
+| `/api/resultados/` | `resultados-service`  | 5004   |
+| `/api/materias/`   | `materias-service`    | 5005   |
+| `/api/respuestas/` | `respuestas-service`  | 5006   |
+| DB (interno)       | `postgres:5432`       | 5432   |
+| DB (host)          | `localhost:5433→5432` | 5433   |
 
-Proyecto de Ensayos PAES: Plataforma de Evaluación Educativa
-Este repositorio contiene la implementación de una plataforma para la gestión y realización de ensayos de preparación académica, utilizando una arquitectura de microservicios. Nuestro objetivo es proporcionar una herramienta robusta para estudiantes y docentes.
+---
 
- -Descripción General
-El proyecto se estructura en varios componentes interconectados:
+## Estructura (resumen)
 
-Autenticación de Usuarios: Permite el registro e inicio de sesión para alumnos, docentes y administradores.
+```
+.
+├─ gateway/                     # Nginx (Dockerfile, nginx.conf)
+├─ services/
+│  ├─ _common/                  # Dockerfile base, middlewares compartidos
+│  ├─ auth/                     # Auth (JWT, Google OAuth)
+│  ├─ materias/
+│  ├─ preguntas/
+│  ├─ ensayos/
+│  ├─ resultados/
+│  └─ respuestas/
+├─ db/                          # init scripts para PostgreSQL
+├─ frontend-paes/               # React app
+└─ docker-compose.yml
+```
 
-Gestión de Contenido: Maneja materias, preguntas (con opciones y respuestas correctas) y la creación de ensayos.
+---
 
-Realización de Ensayos: Los alumnos pueden completar ensayos.
+## Variables de Entorno
 
-Resultados Detallados: Ofrece la visualización de resultados tanto para el alumno individual como para los docentes (con acceso a todos los resultados).
+> **Importante:** No se deben commitear `.env` al repositorio (ver sección `.gitignore`). Los valores de abajo son **para desarrollo local**.
 
-- Tecnologías Clave
-Backend: Node.js (Express.js)
+### Crear `services/auth/.env`
 
-Base de Datos: PostgreSQL
-
-Frontend: React.js
-
-Orquestación: Docker Compose (para gestionar contenedores de microservicios, base de datos y un API Gateway)
-
-API Gateway: Nginx
-
-- Requisitos del Sistema
-Para ejecutar este proyecto, necesitará tener instalado:
-
-Docker Desktop: Incluye Docker Engine y Docker Compose. (Puede encontrar las instrucciones de instalación en el sitio web oficial de Docker).
-
-Node.js y npm (o Yarn): Necesario para el desarrollo del frontend. (Disponible en el sitio web oficial de Node.js).
-
-Un editor de código, como VS Code.
-
-- Pasos para Configurar y Ejecutar
-Siga estos pasos desde la terminal en la raíz del proyecto.
-
-1. Clonar el Repositorio
-Si aún no ha clonado este proyecto, navege en una terminal hasta la carpeta a utilizar y use el siguiente comando:
-
-git clone https://github.com/Daspssj/GRUPO05-2025-PROYINF.git
-
-2. Configuración de Variables de Entorno
-Cree un archivo .env en cada una de las siguientes carpetas (son sensibles a mayúsculas/minúsculas y la extensión .env es importante).
-
-services/auth-service/.env
-
-services/materias-service/.env
-
-services/preguntas-service/.env
-
-services/ensayos-service/.env
-
-services/resultados-service/.env
-
-services/respuestas-service/.env (si existe)
-
-El contenido general para cada uno será:
-
-PORT=XXXX ####DEBE REVISAR EL "docker-compose.yml" en la raiz del backend del proyecto y reemplazar las XXXX por el puerto que corresponde para cada microservicio (Ej: Para el auth service seria PORT=5001)
-
+```
+PORT=5001
 DB_USER=user
-
-DB_HOST=postgres-paes
-
+DB_HOST=postgres
 DB_DATABASE=paes_db
-
 DB_PASSWORD=password
-
 DB_PORT=5432
+JWT_SECRET=superSecret123
 
-JWT_SECRET=supersecretodev
+# OAuth (dev)
+GOOGLE_CLIENT_ID=960162294016-cti4p4ikgkrjuq0l99ckso383nd41spg.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=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
+SESSION_SECRET=algoseguro
+AUTH_PUBLIC_BASE_URL=http://localhost
+FRONTEND_BASE_URL=http://localhost:3000
+```
 
+### Crear `.env` en cada microservicio (si aplica)
 
-Nota Importante: El valor de JWT_SECRET (supersecretodev en este ejemplo) debe ser idéntico en todos los archivos .env de los servicios que lo requieran.
+Para `materias`, `preguntas`, `ensayos`, `resultados`, `respuestas`:
 
-3. Archivo .gitignore (para Git)
-Asegúrese de que el archivo .gitignore exista en la raíz de su proyecto con el siguiente contenido. Esto evita que archivos innecesarios (como las carpetas node_modules o sus archivos .env con secretos) se suban a GitHub.
+```
+PORT=XXXX            # 5002, 5003, 5004, 5005, 5006 según servicio
+DB_USER=user
+DB_HOST=postgres
+DB_DATABASE=paes_db
+DB_PASSWORD=password
+DB_PORT=5432
+JWT_SECRET=superSecret123
+```
 
-# Directorios de módulos
+> **Nota:** Asegúrate de que `JWT_SECRET` sea **idéntico** en todos los servicios que validan tokens.
+
+---
+
+## Ejecución local
+
+1. **Construir imágenes**
+
+```bash
+docker compose build --no-cache
+```
+
+2. **Levantar servicios**
+
+```bash
+docker compose up -d
+docker compose ps
+```
+
+3. **Frontend (React)**
+
+```bash
+cd frontend-paes
+npm install
+npm start
+# abre http://localhost:3000
+```
+4. **Ver el proceso que ocupa el puerto 3000**
+```bash
+lsof -i :3000
+# ejemplo: si el PID es 86234
+kill -9 86234
+```
+
+---
+
+## Pruebas de humo (con todo arriba)
+
+```bash
+# Gateway
+curl -i http://localhost/
+
+# Health de servicios (vía gateway, si tienen /health)
+curl -i http://localhost/api/auth/health
+curl -i http://localhost/api/materias/health
+
+# (Ejemplo) Login → obtener JWT (ajusta email/password a tu caso)
+curl -s -X POST http://localhost/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"docente@test.com","password":"123456"}'
+```
+
+---
+
+## .gitignore (para evitar subir secretos)
+
+Asegura que en la **raíz** del repo exista un `.gitignore` que ignore **todos los `.env`** y `node_modules` de servicios:
+
+```
+# Node
 node_modules/
-frontend/node_modules/
+frontend-paes/node_modules/
 services/*/node_modules/
 
-# Variables de entorno
+# Entornos
 .env
+.env.*
 services/*/.env
 
-# Archivos de logs
+# Logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Otros archivos de build o temporales
+# Builds y editor
 build/
+dist/
 .DS_Store
 .vscode/
-*.sublime-project
-*.sublime-workspace
-*.iml
 .idea/
+```
 
-4. Instalar Dependencias del Frontend
-Navegue a la carpeta frontend e instale sus dependencias:
+---
 
-cd frontend
-npm install # o yarn install
+## Troubleshooting
 
-5. Iniciar los Servicios y el Frontend
-Levantar los Microservicios con Docker Compose:
-Desde la raíz de su proyecto (donde está docker-compose.yml), ejecute:
+* **404 desde frontend a `/api/resultados/...`:** la ruta puede no existir en el microservicio. Revisa `services/resultados/routes/resultados.js` y el prefijo en `index.js` (`/api/resultados`).
+* **401/403 aleatorios:** confirma que el **JWT** no esté expirado y que los roles sean correctos. El interceptor del front diferencia entre token inválido y errores de negocio.
+* **Cambios en `db/init_postgres.sql` no se aplican:** puede existir el volumen. Reconstruir la DB:
 
-docker-compose build --no-cache
+  ```bash
+  docker compose down -v
+  docker compose up -d --build
+  ```
 
-(En caso se presente error sobre la creacion de la imagen en docker, simplemente se debe volver a ejecutar el comando "docker-compose build --no-cache" para lograr construir los contenedores,
-pues es un error interno de Docker en el manejo de las imagenes y no del código en si)
+---
 
-y una vez esten todos los contenedores listos en estado "built" debe ejecutar
+## Seguridad (dev)
 
-docker compose up
+* CORS restringido a `http://localhost:3000` en prod.
+* `JWT_SECRET` por entorno (no hardcodear en código).
+* **Rate limiting** en auth y rutas sensibles (Nginx o Express).
+* `X-Request-Id` en gateway y logs de backend para traza end-to-end.
 
-Este comando construirá y levantará todos los servicios Docker (base de datos, microservicios y Nginx Gateway) en segundo plano.
-
-Verificar el estado de los Contenedores:
-
-docker-compose ps
-
-Todos los servicios deberían mostrar Up.
-
-Iniciar el Frontend:
-En una nueva terminal, navegue al directorio frontend y ejecute:
-
-cd frontend
-npm start # o yarn start
-
-Esto iniciará la aplicación React en su navegador (generalmente en http://localhost:3000).
-
-- Acceso a la Aplicación
-Una vez que todos los servicios estén en marcha, acceda a la aplicación a través de su navegador en: http://localhost:3000.
-
-- Credenciales de Prueba
-Para inicializar en la pagina debe crear un NUEVO USUARIO ya sea de docente o estudiante, y desde ahi empezar a trabajar pues el proyecto no cuenta con cuentas registradas previamente.
-
-troubleshooting
-- Consejos para Solución de Problemas
-Problemas de Conexión (ej. 404 Not Found en frontend):
-
-Asegúrese de que todos los contenedores Docker estén Up (docker-compose ps).
-
-Verifique la configuración del proxy en frontend/package.json y del proxy_pass en gateway/nginx.conf.
-
-Intente reiniciar Docker Compose (docker-compose down y luego docker-compose up --build -d).
-
-Errores del Backend (500 Internal Server Error, Connection Refused):
-
-Revise los logs del microservicio específico que falla (ej. docker-compose logs auth-service).
-
-Confirme que las variables de entorno de la base de datos en los archivos .env de los servicios sean correctas (DB_HOST debe ser postgres-paes).
-
-Problemas de Autenticación (401 Unauthorized, 403 Forbidden):
-
-Verifique que el JWT_SECRET sea idéntico en todos los archivos .env relevantes (servicios y auth-service).
-
-Asegúrese de que los roles asignados a sus usuarios de prueba coincidan con los roles esperados por los middlewares de autorización.
-
-Cambios en la Base de Datos no Aplicados:
-
-Si modificó db/init_postgres.sql y los cambios no aparecen, es probable que el volumen de Docker para PostgreSQL ya exista. Para recrear la base de datos desde cero (perdiendo todos los datos existentes), use:
-
-docker-compose down -v
-docker-compose up --build -d
+---

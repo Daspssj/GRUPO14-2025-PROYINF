@@ -1,11 +1,10 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../db');
+const verificarToken = require('../../_common/middleware/verifyToken');
 
-const { verificarToken } = require('../../_common/middleware');
 
-
-router.get('/', async (req, res) => {
+router.get('/', verificarToken, async (req, res) => {
   try {
     const result = await pool.query('SELECT id, nombre FROM materias');
     res.json(result.rows);
