@@ -1,23 +1,27 @@
+
 -- 02_colegios_cursos.sql
 SET search_path TO "$user", public;
+
 
 -- ====== COLEGIOS ======
 CREATE TABLE IF NOT EXISTS colegios (
   id SERIAL PRIMARY KEY,
   nombre VARCHAR(255) NOT NULL,
   comuna VARCHAR(255),
-  -- columnas generadas para normalizar NULL
+  
+  -- SÓLO comuna_norm (COALESCE es inmutable)
   comuna_norm VARCHAR(255) GENERATED ALWAYS AS (COALESCE(comuna, '')) STORED,
 
-  created_by INT REFERENCES usuarios(id) ON DELETE SET NULL,
+  -- Columna REQUERIDA por el backend (¡Asegúrate de que esté aquí!)
+  created_by INT REFERENCES usuarios(id) ON DELETE SET NULL, 
+
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-  -- ahora sí, UNIQUE sobre columnas (no expresiones)
   CONSTRAINT uq_colegios_nombre_comuna UNIQUE (nombre, comuna_norm)
 );
 
-CREATE INDEX IF NOT EXISTS idx_colegios_nombre ON colegios (nombre);
+CREATE INDEX IF NOT EXISTS idx_colegios_nombre_norm ON colegios (nombre);
 
 -- updated_at automático (reutiliza o crea la función si no existe)
 DO $$

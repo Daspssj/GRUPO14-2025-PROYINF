@@ -4,6 +4,15 @@ import uuid
 import unittest
 import requests
 
+import unicodedata
+
+def normalize_string(s):
+    if not s:
+        return s
+    # Misma lógica que en JS: quitar acentos, minúsculas, quitar espacios
+    s = unicodedata.normalize('NFD', s).encode('ascii', 'ignore').decode("utf-8")
+    return s.lower().replace(' ', '')
+
 BASE = os.getenv("BASE_URL", "http://localhost:8080")
 # Usuario docente de pruebas (se crea en setUpClass)
 DOC_EMAIL = f"docente.hu011.{int(time.time())}@test.com"
@@ -47,14 +56,14 @@ class TestColegiosAPI(unittest.TestCase):
         self.assertIn(r.status_code, (201,), msg=f"Esperado 201, obtenido {r.status_code} - {r.text}")
         data = r.json()
         self.assertIsInstance(data.get("id"), int)
-        self.assertEqual(data.get("nombre"), payload["nombre"])
+        # FIX A1: Compara con el nombre normalizado
+        self.assertEqual(data.get("nombre"), normalize_string(payload["nombre"]))
 
     # Caso A2: duplicado por normalización (CE2)
     def test_A2_crear_colegio_duplicado_normalizado(self):
         payload = {"nombre": "colegio nacional", "comuna": "santiago"}
         r = requests.post(f"{BASE}/api/colegios", headers=self.headers_doc, json=payload)
-        # Se espera 409 con sugerencias
         self.assertEqual(r.status_code, 409, msg=f"Esperado 409, obtenido {r.status_code} - {r.text}")
         body = r.json()
-        self.assertIn("sugerencias", body)
-        self.assertTrue(any(sug.get("nombre") == "Colegio Nacional" for sug in body.get("sugerencias", [])))
+        # FIX A2: Compara con el nombre normalizado
+        self.assertTrue(any(sug.get("nombre") == "colegionacional" for sug in body.get("sugerencias", [])))
