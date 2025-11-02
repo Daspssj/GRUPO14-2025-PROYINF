@@ -1,3 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS unaccent;
 -- 01_schema.sql
 SET search_path TO "$user", public;
 

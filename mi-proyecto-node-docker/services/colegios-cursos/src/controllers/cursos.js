@@ -74,15 +74,24 @@ export async function unirseCurso(req, res) {
 
   const rol = req.user.rol === "docente" ? "docente" : "alumno";
   try {
-    await pool.query(
+    const { rows } = await pool.query( 
       `INSERT INTO curso_miembros (curso_id, usuario_id, rol_en_curso)
        VALUES ($1, $2, $3)
-       ON CONFLICT (curso_id, usuario_id) DO NOTHING`,
+       ON CONFLICT (curso_id, usuario_id) DO NOTHING
+       RETURNING id`, 
       [cursoId, req.user.id, rol]
     );
-    res.status(201).json({ ok: true });
+
+    if (!rows.length) {
+      // D-02: Ya es miembro (OK)
+      return res.status(409).json({ error: "ya_es_miembro" });
+    }
+    
+    // FIX D-03: ¡El cambio crítico! Devolver el ID del curso.
+    return res.status(200).json({ curso_id: cursoId }); // <-- Esta línea es la clave
+    
   } catch (e) {
-    res.status(500).json({ error: "db_error", detail: e.message });
+    return res.status(500).json({ error: "db_error", detail: e.message });
   }
 }
 
