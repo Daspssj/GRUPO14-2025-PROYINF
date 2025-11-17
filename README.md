@@ -74,7 +74,7 @@ Ejemplo de tabla de ruteo:
 | `/api/resultados/`        | `resultados-service`        | 5004           |
 | `/api/materias/`          | `materias-service`          | 5005           |
 | `/api/respuestas/`        | `respuestas-service`        | 5006           |
-| `/api/colegios/`          | `colegios-cursos-service`   | 5010 (ejemplo) |
+| `/api/colegios/`          | `colegios-cursos-service`   | 5007           |
 | `/api/cursos/`            | `colegios-cursos-service`   | 5010           |
 | `/api/mi/`                | `colegios-cursos-service`   | 5010           |
 | `/api/curso_miembros/`    | `colegios-cursos-service`   | 5010           |
