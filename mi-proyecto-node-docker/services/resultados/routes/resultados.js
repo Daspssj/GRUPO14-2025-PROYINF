@@ -8,106 +8,147 @@ const authorizeRoles = require('../../_common/middleware/authorizeRoles');
 // TAREA 4 (NUEVO): Endpoint para iniciar una rendición, validando el acceso (Criterio de Aceptación #2)
 // ---
 router.post('/rendiciones', verificarToken, authorizeRoles(['alumno']), async (req, res) => {
-    const { ventana_id, ensayo_id } = req.body;
-    const alumno_id = req.usuario.id; // Usamos req.usuario.id (proviene de verifyToken)
+  const { ventana_id, ensayo_id } = req.body;
+  const alumno_id = req.usuario.id; // Usamos req.usuario.id (proviene de verifyToken)
 
-    if ((!ventana_id && !ensayo_id) || (ventana_id && ensayo_id)) {
-        return res.status(400).json({ error: 'Debes proporcionar un "ventana_id" o un "ensayo_id", pero no ambos.' });
-    }
-    
-    const client = await pool.connect();
-    try {
-        await client.query('BEGIN');
+  if ((!ventana_id && !ensayo_id) || (ventana_id && ensayo_id)) {
+    return res.status(400).json({ error: 'Debes proporcionar un "ventana_id" o un "ensayo_id", pero no ambos.' });
+  }
 
-        if (ventana_id) {
-            // --- Lógica para ENSAYO POR VENTANA ---
-            // (CORREGIDO: Traemos max_intentos del ensayo)
-            const ventanaResult = await client.query(
-                `SELECT vr.inicio, vr.fin, vr.curso_id, e.id as ensayo_id, e.max_intentos
-                 FROM ventanas_rendicion vr JOIN ensayos e ON vr.ensayo_id = e.id
-                 WHERE vr.id = $1`, [ventana_id]
-            );
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
 
-            if (ventanaResult.rowCount === 0) {
-                await client.query('ROLLBACK');
-                return res.status(404).json({ error: 'Ventana de rendición no encontrada.' });
-            }
-            const ventana = ventanaResult.rows[0];
+    if (ventana_id) {
+      // --- Lógica para ENSAYO POR VENTANA ---
+      const ventanaResult = await client.query(
+        `SELECT vr.inicio,
+                vr.fin,
+                vr.curso_id,
+                e.id           AS ensayo_id,
+                e.max_intentos AS max_intentos
+           FROM ventanas_rendicion vr
+           JOIN ensayos e ON vr.ensayo_id = e.id
+          WHERE vr.id = $1`,
+        [ventana_id]
+      );
 
-            const ahora = new Date();
-            if (ahora < ventana.inicio || ahora > ventana.fin) {
-                await client.query('ROLLBACK');
-                return res.status(403).json({ error: 'Esta evaluación no está disponible en este momento.' });
-            }
-
-            const membresiaResult = await client.query(`SELECT 1 FROM curso_miembros WHERE curso_id = $1 AND usuario_id = $2`, [ventana.curso_id, alumno_id]);
-            if (membresiaResult.rowCount === 0) {
-                await client.query('ROLLBACK');
-                return res.status(403).json({ error: 'No tienes permiso para rendir esta evaluación.' });
-            }
-            
-            // (CORREGIDO: Lógica de intentos para "ventana" ahora cuenta)
-            if (ventana.max_intentos !== null) {
-                // Contamos intentos para ESE ensayo (ventana.ensayo_id)
-                const intentosResult = await client.query(
-                    `SELECT COUNT(*) as num_intentos 
-                     FROM resultados 
-                     WHERE alumno_id = $1 AND ensayo_id = $2`, 
-                    [alumno_id, ventana.ensayo_id]
-                );
-                
-                if (parseInt(intentosResult.rows[0].num_intentos, 10) >= ventana.max_intentos) {
-                    await client.query('ROLLBACK');
-                    return res.status(409).json({ error: 'Has alcanzado el límite de intentos para este ensayo.' });
-                }
-            } else {
-                // Si max_intentos es NULL (ilimitado por el docente),
-                // asumimos que las ventanas son de 1 solo intento por defecto.
-                const intentoPrevio = await client.query(`SELECT 1 FROM resultados WHERE alumno_id = $1 AND ventana_id = $2`, [alumno_id, ventana_id]);
-                if (intentoPrevio.rowCount > 0) {
-                    await client.query('ROLLBACK');
-                    return res.status(409).json({ error: 'Ya has completado un intento para esta evaluación.' });
-                }
-            }
-
-            const resultadoResult = await client.query(`INSERT INTO resultados (ensayo_id, alumno_id, fecha, ventana_id) VALUES ($1, $2, NOW(), $3) RETURNING id`, [ventana.ensayo_id, alumno_id, ventana_id]);
-            await client.query('COMMIT');
-            return res.status(201).json({ mensaje: 'Rendición iniciada.', resultado_id: resultadoResult.rows[0].id });
-
-        } else if (ensayo_id) {
-            // --- Lógica para ENSAYO PERMANENTE (Estaba correcta) ---
-            const ensayoResult = await client.query(`SELECT disponibilidad, max_intentos FROM ensayos WHERE id = $1`, [ensayo_id]);
-            if (ensayoResult.rowCount === 0) {
-                await client.query('ROLLBACK');
-                return res.status(404).json({ error: 'Ensayo no encontrado.' });
-            }
-            const ensayo = ensayoResult.rows[0];
-
-            if (ensayo.disponibilidad !== 'permanente') {
-                await client.query('ROLLBACK');
-                return res.status(400).json({ error: 'Este ensayo solo se puede rendir a través de una ventana asignada.' });
-            }
-
-            if (ensayo.max_intentos !== null) {
-                const intentosResult = await client.query(`SELECT COUNT(*) as num_intentos FROM resultados WHERE alumno_id = $1 AND ensayo_id = $2`, [alumno_id, ensayo_id]);
-                if (parseInt(intentosResult.rows[0].num_intentos, 10) >= ensayo.max_intentos) {
-                    await client.query('ROLLBACK');
-                    return res.status(403).json({ error: 'Has alcanzado el límite de intentos para este ensayo.' });
-                }
-            }
-            
-            const resultadoResult = await client.query(`INSERT INTO resultados (ensayo_id, alumno_id, fecha, ventana_id) VALUES ($1, $2, NOW(), NULL) RETURNING id`, [ensayo_id, alumno_id]);
-            await client.query('COMMIT');
-            return res.status(201).json({ mensaje: 'Rendición iniciada.', resultado_id: resultadoResult.rows[0].id });
-        }
-    } catch (error) {
-        // Asegurarse de hacer rollback si algo falla
+      if (ventanaResult.rowCount === 0) {
         await client.query('ROLLBACK');
-        console.error('💥 Error al iniciar rendición en /rendiciones:', error);
-        res.status(500).json({ error: 'Error interno del servidor.', detalle: error.message });
-    } finally {
-        client.release();
+        return res.status(404).json({ error: 'Ventana de rendición no encontrada.' });
+      }
+      const ventana = ventanaResult.rows[0];
+
+      const ahora = new Date();
+      if (ahora < ventana.inicio || ahora > ventana.fin) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'Esta evaluación no está disponible en este momento.' });
+      }
+
+      const membresiaResult = await client.query(
+        `SELECT 1
+           FROM curso_miembros
+          WHERE curso_id = $1 AND usuario_id = $2`,
+        [ventana.curso_id, alumno_id]
+      );
+      if (membresiaResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(403).json({ error: 'No tienes permiso para rendir esta evaluación.' });
+      }
+
+      // ───── LÍMITE DE INTENTOS PARA ENSAYO POR VENTANA ─────
+      // Normalizamos: null o 0 (o '0') = ilimitado
+      const max = ventana.max_intentos;
+      const numMax = max == null ? null : Number(max);
+      const limite = (numMax === null || numMax === 0) ? null : numMax;
+
+      if (limite !== null) {
+        // Hay límite de intentos (>= 1) → contamos por ensayo
+        const intentosResult = await client.query(
+          `SELECT COUNT(*) AS num_intentos
+             FROM resultados
+            WHERE alumno_id = $1 AND ensayo_id = $2`,
+          [alumno_id, ventana.ensayo_id]
+        );
+
+        const usados = parseInt(intentosResult.rows[0].num_intentos, 10);
+        if (usados >= limite) {
+          await client.query('ROLLBACK');
+          return res.status(409).json({ error: 'Has alcanzado el límite de intentos para este ensayo.' });
+        }
+      }
+      // Si limite es null → ilimitado: no se valida límite para esta ventana/ensayo
+
+      const resultadoResult = await client.query(
+        `INSERT INTO resultados (ensayo_id, alumno_id, fecha, ventana_id)
+         VALUES ($1, $2, NOW(), $3)
+         RETURNING id`,
+        [ventana.ensayo_id, alumno_id, ventana_id]
+      );
+      await client.query('COMMIT');
+      return res.status(201).json({
+        mensaje: 'Rendición iniciada.',
+        resultado_id: resultadoResult.rows[0].id
+      });
+
+    } else if (ensayo_id) {
+      // --- Lógica para ENSAYO PERMANENTE ---
+      const ensayoResult = await client.query(
+        `SELECT disponibilidad, max_intentos
+           FROM ensayos
+          WHERE id = $1`,
+        [ensayo_id]
+      );
+      if (ensayoResult.rowCount === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Ensayo no encontrado.' });
+      }
+      const ensayo = ensayoResult.rows[0];
+
+      if (ensayo.disponibilidad !== 'permanente') {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Este ensayo solo se puede rendir a través de una ventana asignada.' });
+      }
+
+      // Normalizamos: null o 0 (o '0') = ilimitado también para permanentes
+      const maxP = ensayo.max_intentos;
+      const numMaxP = maxP == null ? null : Number(maxP);
+      const limitePermanente = (numMaxP === null || numMaxP === 0) ? null : numMaxP;
+
+      if (limitePermanente !== null) {
+        const intentosResult = await client.query(
+          `SELECT COUNT(*) AS num_intentos
+             FROM resultados
+            WHERE alumno_id = $1 AND ensayo_id = $2`,
+          [alumno_id, ensayo_id]
+        );
+        const usadosP = parseInt(intentosResult.rows[0].num_intentos, 10);
+        if (usadosP >= limitePermanente) {
+          await client.query('ROLLBACK');
+          return res.status(403).json({ error: 'Has alcanzado el límite de intentos para este ensayo.' });
+        }
+      }
+      // limitePermanente null → ilimitado: sin validación de límite
+
+      const resultadoResult = await client.query(
+        `INSERT INTO resultados (ensayo_id, alumno_id, fecha, ventana_id)
+         VALUES ($1, $2, NOW(), NULL)
+         RETURNING id`,
+        [ensayo_id, alumno_id]
+      );
+      await client.query('COMMIT');
+      return res.status(201).json({
+        mensaje: 'Rendición iniciada.',
+        resultado_id: resultadoResult.rows[0].id
+      });
     }
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('💥 Error al iniciar rendición en /rendiciones:', error);
+    res.status(500).json({ error: 'Error interno del servidor.', detalle: error.message });
+  } finally {
+    client.release();
+  }
 });
 
 // Endpoint para que el alumno obtenga sus intentos (para VerEnsayos.jsx)

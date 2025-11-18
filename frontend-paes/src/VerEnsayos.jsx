@@ -92,7 +92,10 @@ const load = useCallback(async () => {
     // 3) Enriquecer cada ensayo con sus ventanas
     const enriched = await Promise.all(base.map(async (e) => {
       const m = M.find(mm => mm.id === e.materia_id);
-      const enrichedItem = { ...e, materiaNombre: m ? m.nombre : 'Materia Desconocida' };
+      const enrichedItem = { 
+        ...e, 
+        materiaNombre: m ? m.nombre : 'Materia Desconocida' 
+      };
 
       try {
         const vRes = await axiosInstance.get(`/api/ensayos/${e.id}/ventanas`);
@@ -100,11 +103,28 @@ const load = useCallback(async () => {
           enrichedItem.disponibilidad = 'ventana';
           enrichedItem.ventanas = vRes.data;
         }
-      } catch (_) { /* 404/501: sin ventanas -> seguimos */ }
+      } catch (_) {
+        // 404/501: sin ventanas -> seguimos
+      }
 
-      if (!enrichedItem.disponibilidad) enrichedItem.disponibilidad = e.disponibilidad || 'permanente';
-      if (!enrichedItem.max_intentos && e.max_intentos != null) enrichedItem.max_intentos = e.max_intentos;
-      enrichedItem.intentos_realizados = intentosMap.get(e.id) || (e.intentos_realizados || 0);
+      // Si no viene disponibilidad desde ventanas, usar la del ensayo o 'permanente'
+      if (!enrichedItem.disponibilidad) {
+        enrichedItem.disponibilidad = e.disponibilidad || 'permanente';
+      }
+
+      // Cargar max_intentos si no lo tiene aún
+      if (enrichedItem.max_intentos == null && e.max_intentos != null) {
+        enrichedItem.max_intentos = e.max_intentos;
+      }
+
+      // 0 significa ilimitado → lo tratamos como null en el front
+      if (enrichedItem.max_intentos === 0) {
+        enrichedItem.max_intentos = null;
+      }
+
+      // Intentos realizados (contador desde misResultados, con fallback a lo que venga del back)
+      enrichedItem.intentos_realizados =
+        intentosMap.get(e.id) ?? e.intentos_realizados ?? 0;
 
       return enrichedItem;
     }));
@@ -218,20 +238,18 @@ const load = useCallback(async () => {
   };
 
   const renderIntentos = (e) => {
-    // getUsados() ahora funciona gracias a la corrección en load()
     const usados = getUsados(e);
-    const max = e.max_intentos ?? null;
+    const maxRaw = e.max_intentos;
 
-    // Si max es null (ilimitado)
-    if (max === null) {
-      // Si es permanente, es ilimitado
-      if (e.disponibilidad === 'permanente') return 'Ilimitado';
-      // Si es ventana y max es null (docente puso 0), asumimos 1 intento
-      return `${usados}/1`;
+    // null o undefined => ilimitado
+    if (maxRaw == null) {
+      // Puedes mostrar sólo "Ilimitado" o también cuántos lleva usados
+      // return `(${usados}) Ilimitado`;
+      return 'Ilimitado';
     }
 
-    // Si max tiene un valor (ej: 2)
-    return `${usados}/${max}`; // Mostrará "0/2", "1/2", etc.
+    const max = Number(maxRaw);
+    return `${usados}/${max}`;
   };
 
   // Iniciar rendición (y si el back rechaza por límite/ventana, mover a ND en vivo)
