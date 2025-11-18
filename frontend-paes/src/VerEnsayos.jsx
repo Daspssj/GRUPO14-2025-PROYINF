@@ -22,6 +22,13 @@ const dedupeById = (arr) => {
 const getUsados = (e) =>
   e.intentos_realizados ?? e.intentos ?? e.realizados ?? e.intentos_usados ?? 0;
 
+// NUEVA UTILIDAD solucion propuesta: Chequea si se ha excedido el límite de intentos
+const esLimiteIntentosExcedido = (e) => {
+  const max = e.max_intentos ?? null;
+  const usados = getUsados(e);
+  return (max != null) && (Number(usados) >= Number(max));
+};
+
 // Calcula ventana actual / próxima a partir del objeto (usa e.ventana_actual / ventana_proxima si vienen,
 // y si no, infiere desde e.ventanas).
 const computeEstadoVentana = (e) => {
@@ -47,6 +54,31 @@ const computeEstadoVentana = (e) => {
   if (ventanaProxima) return { key: 'proximo', ventanaActual: null, ventanaProxima };
   return { key: 'cerrado', ventanaActual: null, ventanaProxima: null };
 };
+
+// NUEVA UTILIDAD resolviendo issue: Clasifica un ensayo de tipo 'ventana'
+const clasificarEnsayoVentana = (e, V, pushND) => {
+    const est = computeEstadoVentana(e);
+    const row = { ...e, _estado: est };
+
+    if (est.key === 'disponible' && est.ventanaActual) {
+      V.push(row); // Disponible ahora
+      return;
+    }
+    
+    if (est.key === 'proximo') {
+      pushND(row, 'Ventana futura'); // No disponible: Próximo
+      return;
+    }
+    
+    // No disponible: Cerrado/Vencido
+    let motivo = 'Sin ventana activa';
+    if (Array.isArray(e.ventanas) && e.ventanas.length) {
+      const allPast = e.ventanas.every(v => new Date(v.fin) <= new Date());
+      if (allPast) motivo = 'Ventana vencida';
+    }
+    pushND(row, motivo);
+};
+
 
 const VerEnsayos = ({ alumnoId }) => {
   const [ensayosVentana, setEnsayosVentana] = useState([]);   // por ventana (disponibles ahora)
@@ -129,32 +161,23 @@ const load = useCallback(async () => {
       return enrichedItem;
     }));
 
-    // 4) Clasificación (igual que ya tienes)
+    // 4) Clasificación (Lógica refactorizada para reducir la Complejidad Cognitiva)
     const V = [], G = [], ND = [];
     const pushND = (row, motivo) => ND.push({ ...row, _motivo: motivo });
 
     dedupeById(enriched).forEach((e) => {
-      const max = e.max_intentos ?? null;
-      const usados = getUsados(e);
-      const excedido = (max != null) && (Number(usados) >= Number(max));
+      // 1. Chequeo de límite de intentos (Extraído, usando early return)
+      if (esLimiteIntentosExcedido(e)) {
+        pushND(e, 'Límite de intentos alcanzado');
+        return; 
+      }
 
+      // 2. Clasificación por disponibilidad (Lógica interna extraída)
       if (e.disponibilidad === 'ventana') {
-        const est = computeEstadoVentana(e);
-        const row = { ...e, _estado: est };
-        if (excedido)        pushND(row, 'Límite de intentos alcanzado');
-        else if (est.key === 'disponible' && est.ventanaActual) V.push(row);
-        else if (est.key === 'proximo')                         pushND(row, 'Ventana futura');
-        else {
-          let motivo = 'Sin ventana activa';
-          if (Array.isArray(e.ventanas) && e.ventanas.length) {
-            const allPast = e.ventanas.every(v => new Date(v.fin) <= new Date());
-            if (allPast) motivo = 'Ventana vencida';
-          }
-          pushND(row, motivo);
-        }
-      } else {
-        if (excedido) pushND(e, 'Límite de intentos alcanzado');
-        else G.push(e);
+        clasificarEnsayoVentana(e, V, pushND); // Llama a utilidad
+      } else { 
+        // Lógica de ensayo permanente
+        G.push(e);
       }
     });
 
