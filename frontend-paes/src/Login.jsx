@@ -3,6 +3,7 @@ import React, { useState, useCallback } from 'react';
 import axiosInstance from './services/axiosConfig';
 import './Login.css';
 import { useNavigate } from 'react-router-dom';
+import PropTypes from 'prop-types';
 
 const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost';
 
@@ -201,6 +202,11 @@ const Login = ({ onLogin }) => {
       </p>
     </div>
   );
+};
+
+Login.propTypes = {
+  // onLogin puede ser opcional
+  onLogin: PropTypes.func, 
 };
 
 export default Login;
