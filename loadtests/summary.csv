@@ -1,0 +1,3 @@
+Label,# Samples,Average,Min,Max,Std. Dev.,Error %,Throughput,Received KB/sec,Sent KB/sec,Avg. Bytes
+GET disponibles alumno,250,4092,4046,4124,14.24,100.000%,8.29463,22.20,0.00,2741.0
+TOTAL,250,4092,4046,4124,14.24,100.000%,8.29463,22.20,0.00,2741.0
